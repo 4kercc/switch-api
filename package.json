@@ -1,0 +1,35 @@
+{
+  "name": "api-gateway-allin",
+  "version": "1.0.0",
+  "description": "API 聚合与全动态多渠道分流服务 - 轻量高可用大模型网关",
+  "type": "module",
+  "main": "src/server/index.js",
+  "scripts": {
+    "start": "node src/server/index.js",
+    "dev": "node --watch src/server/index.js"
+  },
+  "keywords": [
+    "api-gateway",
+    "router",
+    "channel-dispatch",
+    "llm-proxy",
+    "openai",
+    "claude",
+    "gemini"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.13.4",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "socks-proxy-agent": "^10.1.0",
+    "ws": "^8.19.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 聚合与多渠道分流管理控制台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- Toast 消息提示容器 -->
+  <div id="toast-container"></div>
+
+  <!-- 1. 登录表单遮罩 -->
+  <div id="loginView" style="display: flex; height: 100vh; align-items: center; justify-content: center; background: #0f172a;">
+    <div style="background: #ffffff; padding: 32px 36px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+      <h2 style="font-size: 1.35rem; margin-bottom: 8px; text-align: center; color: #1e293b;">⚡ API 聚合分流网关</h2>
+      <p style="font-size: 0.85rem; color: #64748b; text-align: center; margin-bottom: 24px;">请输入管理员账号与密码登录控制台</p>
+      
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>管理员账号</label>
+          <input type="text" id="loginUsername" placeholder="默认: admin" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>管理员密码</label>
+          <input type="password" id="loginPassword" placeholder="请输入密码" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px; font-weight: bold; margin-top: 8px;">🔐 登 录</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. 主控制台主界面 (登录后展示) -->
+  <div id="dashboardView" class="app-container hidden">
+    <!-- 侧边栏导航 -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span>🔀</span> API 聚合分流
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-item active" data-tab="tab-overview" onclick="switchTab('tab-overview')">
+          <span>📊</span> 实时看板与日志
+        </div>
+        <div class="nav-item" data-tab="tab-channels" onclick="switchTab('tab-channels')">
+          <span>🔀</span> 外部渠道分流
+        </div>
+        <div class="nav-item" data-tab="tab-keys" onclick="switchTab('tab-keys')">
+          <span>🔑</span> API 密钥管理
+        </div>
+        <div class="nav-item" data-tab="tab-settings" onclick="switchTab('tab-settings')">
+          <span>⚙️</span> 系统与 SSL 设置
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="currentUserSpan">admin</span>
+        <button class="btn btn-xs btn-secondary" onclick="handleLogout()">退出</button>
+      </div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      
+      <!-- Tab 1: 实时看板与日志 (默认首屏) -->
+      <section id="tab-overview" class="tab-pane active">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="font-size: 1.3rem;">📊 运行概览与实时请求流</h2>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-sm btn-secondary" onclick="loadStats()">🔄 刷新数据</button>
+            <button class="btn btn-sm btn-danger" onclick="clearLogs()">🗑️ 清空日志</button>
+          </div>
+        </div>
+
+        <!-- 统计面板 -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">运行时间 (Uptime)</span>
+            <span class="stat-val" id="statUptime">-</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">活跃渠道 / 总渠道</span>
+            <span class="stat-val" id="statChannels">-</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">累计处理请求</span>
+            <span class="stat-val" id="statRequests">-</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">累计消耗 Tokens</span>
+            <span class="stat-val" id="statTokens">-</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">内存占用 (RSS)</span>
+            <span class="stat-val" id="statMemory">-</span>
+          </div>
+        </div>
+
+        <!-- 实时终端日志流 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="font-size: 0.95rem; color: #475569;">🟢 实时请求监控终端 (WebSocket 已连接)</h4>
+          <span style="font-size: 0.8rem; color: #94a3b8;">自动向下滚动</span>
+        </div>
+        <div id="consoleContainer" class="console-box">
+          <div class="log-line" style="color: #64748b;">[系统准备就绪] 正在等待请求接入...</div>
+        </div>
+      </section>
+
+      <!-- Tab 2: 外部渠道分流管理 -->
+      <section id="tab-channels" class="tab-pane">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h2 style="font-size: 1.3rem;">🔀 外部上游渠道分流</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
+              支持为每个上游账号绑定独立的本地路由前缀（如 <code>/v2</code>、<code>/v3</code>、<code>/vip</code>、<code>/fast</code>），或留空参与全局轮询。
+            </p>
+          </div>
+          <button class="btn btn-success" onclick="openAddChannelModal()">➕ 添加外部渠道</button>
+        </div>
+
+        <div id="channelsContainer" style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="text-align: center; color: #94a3b8; padding: 40px;">正在加载渠道列表...</div>
+        </div>
+      </section>
+
+      <!-- Tab 3: API Key 管理 -->
+      <section id="tab-keys" class="tab-pane">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h2 style="font-size: 1.3rem;">🔑 API 访问密钥管理</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
+              客户端在调用 <code>/v1/chat/completions</code>、<code>/v2/...</code> 或自定义分流接口时，需携带以下有效密钥进行鉴权。
+            </p>
+          </div>
+          <button class="btn btn-primary" onclick="openAddKeyModal()">➕ 创建新密钥</button>
+        </div>
+
+        <div id="keysContainer" style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="text-align: center; color: #94a3b8; padding: 40px;">正在加载密钥列表...</div>
+        </div>
+      </section>
+
+      <!-- Tab 4: 系统与 SSL 设置 -->
+      <section id="tab-settings" class="tab-pane">
+        <div style="max-width: 720px;">
+          <h2 style="font-size: 1.3rem; margin-bottom: 16px;">⚙️ 系统与 SSL 域名配置</h2>
+
+          <!-- 基础设置 -->
+          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h4 style="margin-bottom: 14px; font-size: 1rem;">🖥️ 服务端口与代理设置</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label>监听端口 (PORT)</label>
+                <input type="number" id="cfgPort" placeholder="8045">
+              </div>
+              <div class="form-group">
+                <label>监听地址 (HOST)</label>
+                <input type="text" id="cfgHost" placeholder="0.0.0.0">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>SOCKS5 上游代理 (例如: socks5://127.0.0.1:40000)</label>
+              <input type="text" id="cfgProxy" placeholder="留空则直连">
+            </div>
+            <div class="form-group">
+              <label>HTTPS 开关 (SSL)</label>
+              <select id="cfgSSL">
+                <option value="false">关闭 (使用普通 HTTP)</option>
+                <option value="true">开启 (启用 HTTPS 原生加密)</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" onclick="saveSystemConfig()">💾 保存服务配置</button>
+          </div>
+
+          <!-- SSL 证书申请 -->
+          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
+            <h4 style="margin-bottom: 14px; font-size: 1rem;">🔒 域名与 SSL 自动证书</h4>
+            <div class="form-group">
+              <label>绑定域名 (Domain)</label>
+              <input type="text" id="cfgDomain" placeholder="例如: api.yourdomain.com">
+            </div>
+            <div id="certStatusInfo" style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">正在检测证书状态...</div>
+            <button class="btn btn-success" onclick="issueCert()">🚀 一键申请/更新 ACME 证书</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

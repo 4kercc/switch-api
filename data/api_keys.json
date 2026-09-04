@@ -1,0 +1,13 @@
+[
+  {
+    "id": "master_key",
+    "name": "默认主密钥",
+    "key": "sk-allin-gateway-master-key-2026",
+    "role": "admin",
+    "enable": true,
+    "createdAt": 1788540107247,
+    "totalRequests": 0,
+    "totalTokens": 0,
+    "modelsUsage": {}
+  }
+]

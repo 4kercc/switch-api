@@ -1,0 +1,19 @@
+{
+  "server": {
+    "port": 8045,
+    "host": "0.0.0.0",
+    "ssl": false,
+    "domain": "",
+    "autoRenewCert": true,
+    "maxRequestSize": "50mb",
+    "heartbeatInterval": 15000
+  },
+  "log": {
+    "maxSizeMB": 10,
+    "maxFiles": 5,
+    "maxMemory": 500
+  },
+  "other": {
+    "timeout": 120000
+  }
+}
