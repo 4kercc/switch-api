@@ -348,6 +348,15 @@ function openAddChannelModal() {
           <input type="text" id="addChanName" class="form-input" placeholder="例如: 斯巴达-1号 / mx.mk v2">
         </div>
         <div class="form-group">
+          <label class="form-label">上游协议兼容模式</label>
+          <select id="addChanType" class="form-select" onchange="handleProtocolTypeChange('add')">
+            <option value="openai">OpenAI 兼容模式 (自动匹配 /chat/completions)</option>
+            <option value="claude">Claude 兼容模式 (自动匹配 /v1/messages)</option>
+            <option value="gemini">Gemini 兼容模式 (自动匹配 /v1beta/models/...)</option>
+          </select>
+          <div class="form-hint" id="addProtocolHint">支持标准 OpenAI 协议规范端点，只需填基础地址，系统自动补齐接口。</div>
+        </div>
+        <div class="form-group">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <label class="form-label" style="margin:0;">本地分流路径 (支持任意英文/版本号)</label>
             <button type="button" class="btn btn-outline btn-xs" id="randomAddPathBtn">🎲 随机生成</button>
@@ -356,8 +365,9 @@ function openAddChannelModal() {
           <div class="form-hint">客户端请求 <code>/xxx/chat/completions</code> 直接走此专属渠道；留空则参与全局轮询。</div>
         </div>
         <div class="form-group">
-          <label class="form-label">上游接口 Base URL *</label>
-          <input type="text" id="addChanBaseUrl" class="form-input" placeholder="例如: https://token.mx.mk/v2 或 http://127.0.0.1:8088/v1">
+          <label class="form-label">上游接口 Base URL * (无需输完整长路径)</label>
+          <input type="text" id="addChanBaseUrl" class="form-input" placeholder="例如: https://api.openai.com 或 https://token.mx.mk/v2">
+          <div class="form-hint" id="addBaseUrlHint">💡 填主机域名即可，系统根据所选模式自动补齐完整端点</div>
         </div>
         <div class="form-group">
           <label class="form-label">API Key (密钥，无密码可留空)</label>
@@ -390,6 +400,7 @@ function openAddChannelModal() {
 
   modal.querySelector('#confirmAddChanBtn').onclick = async () => {
     const name = modal.querySelector('#addChanName').value.trim();
+    const type = modal.querySelector('#addChanType').value;
     const pathPrefix = modal.querySelector('#addChanPath').value.trim();
     const baseUrl = modal.querySelector('#addChanBaseUrl').value.trim();
     const apiKey = modal.querySelector('#addChanApiKey').value.trim();
@@ -408,6 +419,7 @@ function openAddChannelModal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name || '外部渠道',
+          type,
           pathPrefix,
           baseUrl,
           apiKey,
@@ -435,6 +447,8 @@ function openEditChannelModal(id) {
   const chan = cachedChannels.find(c => c.id === id);
   if (!chan) return;
 
+  const currentType = (chan.type || 'openai').toLowerCase();
+
   const modal = document.createElement('div');
   modal.className = 'ui-dialog-backdrop';
   modal.innerHTML = `
@@ -448,6 +462,15 @@ function openEditChannelModal(id) {
           <input type="text" id="editChanName" class="form-input" value="${escapeHtml(chan.name || '')}">
         </div>
         <div class="form-group">
+          <label class="form-label">上游协议兼容模式</label>
+          <select id="editChanType" class="form-select" onchange="handleProtocolTypeChange('edit')">
+            <option value="openai" ${currentType === 'openai' ? 'selected' : ''}>OpenAI 兼容模式 (自动匹配 /chat/completions)</option>
+            <option value="claude" ${currentType === 'claude' ? 'selected' : ''}>Claude 兼容模式 (自动匹配 /v1/messages)</option>
+            <option value="gemini" ${currentType === 'gemini' ? 'selected' : ''}>Gemini 兼容模式 (自动匹配 /v1beta/models/...)</option>
+          </select>
+          <div class="form-hint" id="editProtocolHint">支持标准协议规范端点，只需填基础地址，系统自动补齐接口。</div>
+        </div>
+        <div class="form-group">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <label class="form-label" style="margin:0;">本地分流路径 (支持任意英文/版本号)</label>
             <button type="button" class="btn btn-outline btn-xs" id="randomEditPathBtn">🎲 随机生成</button>
@@ -455,8 +478,9 @@ function openEditChannelModal(id) {
           <input type="text" id="editChanPath" class="form-input" value="${escapeHtml(chan.pathPrefix || '')}" placeholder="例如: /v2, /v3, /vip, /fast" style="margin-top:0.35rem;">
         </div>
         <div class="form-group">
-          <label class="form-label">上游接口 Base URL *</label>
+          <label class="form-label">上游接口 Base URL * (无需输完整长路径)</label>
           <input type="text" id="editChanBaseUrl" class="form-input" value="${escapeHtml(chan.baseUrl || '')}">
+          <div class="form-hint" id="editBaseUrlHint">💡 填主机域名即可，系统根据所选模式自动补齐完整端点</div>
         </div>
         <div class="form-group">
           <label class="form-label">API Key (留空不修改)</label>
@@ -489,6 +513,7 @@ function openEditChannelModal(id) {
 
   modal.querySelector('#confirmEditChanBtn').onclick = async () => {
     const name = modal.querySelector('#editChanName').value.trim();
+    const type = modal.querySelector('#editChanType').value;
     const pathPrefix = modal.querySelector('#editChanPath').value.trim();
     const baseUrl = modal.querySelector('#editChanBaseUrl').value.trim();
     const apiKey = modal.querySelector('#editChanApiKey').value.trim();
@@ -498,6 +523,7 @@ function openEditChannelModal(id) {
 
     const updates = {
       name: name || chan.name,
+      type,
       pathPrefix,
       baseUrl,
       models: modelsStr ? modelsStr.split(',').map(s => s.trim()).filter(Boolean) : [],
@@ -524,6 +550,25 @@ function openEditChannelModal(id) {
       showToast('更新异常: ' + e.message, 'error');
     }
   };
+}
+
+function handleProtocolTypeChange(prefix) {
+  const typeSelect = document.getElementById(`${prefix}ChanType`);
+  const hintEl = document.getElementById(`${prefix}ProtocolHint`);
+  const inputEl = document.getElementById(`${prefix}ChanBaseUrl`);
+  if (!typeSelect || !hintEl) return;
+
+  const val = typeSelect.value;
+  if (val === 'claude') {
+    hintEl.textContent = 'Claude 模式：系统将自动对接 Anthropic 协议与 /v1/messages 端点。';
+    if (inputEl && !inputEl.value) inputEl.placeholder = '例如: https://api.anthropic.com';
+  } else if (val === 'gemini') {
+    hintEl.textContent = 'Gemini 模式：系统将自动对接 Google AI 协议与 /v1beta/models/... 端点。';
+    if (inputEl && !inputEl.value) inputEl.placeholder = '例如: https://generativelanguage.googleapis.com';
+  } else {
+    hintEl.textContent = 'OpenAI 模式：系统将自动对接 /chat/completions 端点 (兼容 OneAPI / NewAPI / 中转)。';
+    if (inputEl && !inputEl.value) inputEl.placeholder = '例如: https://api.openai.com 或 https://token.mx.mk/v2';
+  }
 }
 
 async function toggleChannel(id, enable) {
