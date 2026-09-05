@@ -7,6 +7,7 @@ import { getConfigPaths } from '../utils/paths.js';
 import { generateToken, verifyToken, verifyPassword } from '../auth/auth.js';
 import apiKeyManager from '../auth/apiKeyManager.js';
 import channelManager from '../utils/channelManager.js';
+import ipBlockManager from '../utils/ipBlockManager.js';
 import { testExternalChannel } from '../api/externalChannelClient.js';
 import { getCertificateInfo, issueAcmeCert, generateSelfSignedCert } from '../utils/cert.js';
 import logger from '../utils/logger.js';
@@ -44,8 +45,10 @@ export const cookieAuthMiddleware = (req, res, next) => {
 
 // ==================== 认证相关 ====================
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { username, password } = req.body || {};
+  const clientIP = req.clientIP || req.ip || 'unknown';
+
   if (!username || !password) {
     return res.status(400).json({ success: false, message: '用户名和密码必填' });
   }
@@ -59,6 +62,8 @@ router.post('/login', (req, res) => {
     return res.json({ success: true, token, message: '登录成功' });
   }
 
+  // 登录失败记录安全违规（加权 5 分，6次失败即可临时封禁）
+  await ipBlockManager.recordViolation(clientIP, 'login_fail', 5);
   return res.status(401).json({ success: false, message: '用户名或密码错误' });
 });
 
@@ -259,6 +264,51 @@ router.post('/cert/issue', cookieAuthMiddleware, async (req, res) => {
     res.json({ success: true, message: `域名 ${domain} 的 SSL 证书签发成功！` });
   } catch (e) {
     res.status(500).json({ success: false, message: `证书签发失败: ${e.message}` });
+  }
+});
+
+// ==================== IP 封禁与黑名单管理 API ====================
+
+// 获取所有被封禁/拉黑的 IP 列表
+router.get('/security/blocked-ips', cookieAuthMiddleware, async (req, res) => {
+  try {
+    const list = await ipBlockManager.listBlocked();
+    res.json({ success: true, data: list });
+  } catch (error) {
+    logger.error('获取封禁 IP 列表失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 手动将 IP 加入黑名单/封禁
+router.post('/security/block-ip', cookieAuthMiddleware, async (req, res) => {
+  try {
+    const { ip, permanent = true, durationMs } = req.body || {};
+    if (!ip) return res.status(400).json({ success: false, message: 'IP 地址不能为空' });
+
+    const ok = await ipBlockManager.blockIP(ip, permanent, durationMs);
+    res.json({ success: ok, message: `IP [${ip}] 已成功加入${permanent ? '永久黑名单' : '封禁列表'}` });
+  } catch (error) {
+    logger.error('手动封禁 IP 失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 解除指定 IP 的封禁/黑名单
+router.post('/security/unblock-ip', cookieAuthMiddleware, async (req, res) => {
+  try {
+    const { ip } = req.body || {};
+    if (!ip) return res.status(400).json({ success: false, message: 'IP 地址不能为空' });
+
+    const ok = await ipBlockManager.unblock(ip);
+    if (ok) {
+      res.json({ success: true, message: `IP [${ip}] 已解除封禁` });
+    } else {
+      res.status(404).json({ success: false, message: '该 IP 不在封禁列表中' });
+    }
+  } catch (error) {
+    logger.error('解除封禁失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

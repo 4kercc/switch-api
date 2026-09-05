@@ -273,7 +273,7 @@
           </div>
 
           <!-- SSL 证书申请 -->
-          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
+          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
             <h4 style="margin-bottom: 14px; font-size: 1rem;">🔒 域名与 SSL 自动证书</h4>
             <div class="form-group">
               <label>绑定域名 (Domain)</label>
@@ -281,6 +281,36 @@
             </div>
             <div id="certStatusInfo" style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">正在检测证书状态...</div>
             <button class="btn btn-success" onclick="issueCert()">🚀 一键申请/更新 ACME 证书</button>
+          </div>
+
+          <!-- IP 黑名单与安全防护面板 -->
+          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+              <div>
+                <h4 style="font-size: 1rem; color: #1e293b; margin:0;">🛡️ IP 封禁与黑名单防御</h4>
+                <p style="font-size:0.8rem; color:#64748b; margin-top:2px;">连续 30 次异常自动封禁 60 分钟，连续 3 次失败自动永久拉黑。</p>
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="openManualBlockModal()">➕ 手动拉黑 IP</button>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                <thead>
+                  <tr style="border-bottom: 2px solid var(--border-color); text-align: left; color: #64748b;">
+                    <th style="padding: 8px;">IP 地址</th>
+                    <th style="padding: 8px;">封禁类型</th>
+                    <th style="padding: 8px;">剩余时间 / 状态</th>
+                    <th style="padding: 8px;">累计触发次数</th>
+                    <th style="padding: 8px; text-align: right;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="blockedIpsTableBody">
+                  <tr>
+                    <td colspan="5" style="text-align: center; padding: 20px; color: #94a3b8;">暂无被封禁的 IP</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>

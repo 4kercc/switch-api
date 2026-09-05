@@ -124,7 +124,10 @@ function switchTab(tabId) {
   if (tabId === 'tab-channels') loadChannels();
   if (tabId === 'tab-keys') loadApiKeys();
   if (tabId === 'tab-stats') loadApiKeys();
-  if (tabId === 'tab-settings') loadConfig();
+  if (tabId === 'tab-settings') {
+    loadConfig();
+    loadBlockedIps();
+  }
 }
 
 // ==================== 实时看板与 WebSocket 日志 ====================
@@ -185,8 +188,9 @@ function appendConsoleLog(log) {
     const chanTag = log.channelName ? `<span class="log-chan">[渠道: ${escapeHtml(log.channelName)}]</span> ` : '';
     const modelTag = log.model ? `<span class="log-model">[${escapeHtml(log.model)}]</span> ` : '';
     const tokenInfo = log.usage ? ` <span style="color:#94a3b8;">| Tokens: In ${log.usage.prompt_tokens||0} / Out ${log.usage.completion_tokens||0}</span>` : '';
+    const ipHtml = `<span class="ip-link" onclick="promptBlockIp('${escapeHtml(log.ip)}')" title="点击快捷将该 IP 加入黑名单/封禁">${escapeHtml(log.ip)}</span>`;
 
-    line.innerHTML = `<span class="log-time">${log.time}</span> <span class="log-req">[${log.method}]</span> [${log.ip}] - ${escapeHtml(log.url)} ${chanTag}${modelTag}<span class="${statusClass}">${log.status}</span> <span style="color:#64748b;">${log.duration}ms</span>${tokenInfo}`;
+    line.innerHTML = `<span class="log-time">${log.time}</span> <span class="log-req">[${log.method}]</span> [${ipHtml}] - ${escapeHtml(log.url)} ${chanTag}${modelTag}<span class="${statusClass}">${log.status}</span> <span style="color:#64748b;">${log.duration}ms</span>${tokenInfo}`;
   } else {
     const color = log.type === 'error' ? '#ef4444' : (log.type === 'warn' ? '#f59e0b' : '#10b981');
     line.innerHTML = `<span class="log-time">${log.time}</span> <span style="color:${color}; font-weight:bold;">[${log.type}]</span> ${escapeHtml(log.message)}`;
@@ -896,6 +900,182 @@ async function issueCert() {
     }
   } catch (e) {
     showToast('申请异常: ' + e.message, 'error');
+  }
+}
+
+// ==================== IP 封禁与黑名单交互 ====================
+
+async function loadBlockedIps() {
+  const tbody = document.getElementById('blockedIpsTableBody');
+  if (!tbody) return;
+
+  try {
+    const res = await authFetch('/admin/security/blocked-ips');
+    const data = await res.json();
+    if (data.success) {
+      const list = data.data || [];
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #94a3b8;">暂无被封禁的 IP</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(item => {
+        const typeBadge = item.permanent 
+          ? `<span style="background:#ef4444; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.75rem; font-weight:bold;">永久黑名单</span>`
+          : `<span style="background:#f59e0b; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.75rem;">临时封禁</span>`;
+
+        let statusText = '永久拦截';
+        if (!item.permanent && item.expiresAt) {
+          const remainMins = Math.max(1, Math.ceil((item.expiresAt - Date.now()) / 60000));
+          statusText = `还剩 ${remainMins} 分钟解封`;
+        }
+
+        return `
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 8px; font-family: monospace; font-weight: bold; color: #ef4444;">${escapeHtml(item.ip)}</td>
+            <td style="padding: 8px;">${typeBadge}</td>
+            <td style="padding: 8px; font-size: 0.85rem; color: #64748b;">${statusText}</td>
+            <td style="padding: 8px;">${item.tempBlockCount || 0} 次</td>
+            <td style="padding: 8px; text-align: right;">
+              <button class="btn btn-xs btn-success" onclick="unblockIp('${escapeHtml(item.ip)}')">🔓 解除封禁</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (e) {}
+}
+
+function promptBlockIp(ip) {
+  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip === 'localhost') {
+    showToast('本地回环 IP 不允许加入黑名单', 'warning');
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-title">🛡️ 快捷封禁 / 加入黑名单</div>
+      <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:12px; margin-bottom:14px; font-size:0.88rem; color:#991b1b;">
+        是否将目标 IP <code>${escapeHtml(ip)}</code> 拦截封禁？
+      </div>
+      <div class="form-group">
+        <label>封禁类型</label>
+        <select id="quickBlockType">
+          <option value="temp_60">临时封禁 60 分钟</option>
+          <option value="temp_1440">临时封禁 24 小时</option>
+          <option value="perm">永久加入黑名单 (禁止所有访问)</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
+        <button class="btn btn-danger" id="confirmQuickBlockBtn">🚫 确认拦截</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#confirmQuickBlockBtn').onclick = async () => {
+    const val = modal.querySelector('#quickBlockType').value;
+    const permanent = val === 'perm';
+    let durationMs = 60 * 60 * 1000;
+    if (val === 'temp_1440') durationMs = 24 * 60 * 60 * 1000;
+
+    try {
+      const res = await authFetch('/admin/security/block-ip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, permanent, durationMs })
+      });
+      const data = await res.json();
+      modal.remove();
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadBlockedIps();
+      } else {
+        showToast(data.message || '操作失败', 'error');
+      }
+    } catch (e) {
+      showToast('请求异常: ' + e.message, 'error');
+    }
+  };
+}
+
+function openManualBlockModal() {
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-title">➕ 手动添加封禁 IP</div>
+      <div class="form-group">
+        <label>IP 地址</label>
+        <input type="text" id="manualBlockIp" placeholder="例如: 123.45.67.89">
+      </div>
+      <div class="form-group">
+        <label>封禁类型</label>
+        <select id="manualBlockType">
+          <option value="perm">永久加入黑名单</option>
+          <option value="temp_60">临时封禁 60 分钟</option>
+          <option value="temp_1440">临时封禁 24 小时</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
+        <button class="btn btn-danger" id="confirmManualBlockBtn">🚫 添加封禁</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#confirmManualBlockBtn').onclick = async () => {
+    const ip = modal.querySelector('#manualBlockIp').value.trim();
+    if (!ip) {
+      showToast('请输入 IP 地址', 'warning');
+      return;
+    }
+    const val = modal.querySelector('#manualBlockType').value;
+    const permanent = val === 'perm';
+    let durationMs = 60 * 60 * 1000;
+    if (val === 'temp_1440') durationMs = 24 * 60 * 60 * 1000;
+
+    try {
+      const res = await authFetch('/admin/security/block-ip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, permanent, durationMs })
+      });
+      const data = await res.json();
+      modal.remove();
+      if (data.success) {
+        showToast(data.message, 'success');
+        loadBlockedIps();
+      } else {
+        showToast(data.message || '操作失败', 'error');
+      }
+    } catch (e) {
+      showToast('请求异常: ' + e.message, 'error');
+    }
+  };
+}
+
+async function unblockIp(ip) {
+  if (!confirm(`确定要解除对 IP [${ip}] 的封禁吗？`)) return;
+  try {
+    const res = await authFetch('/admin/security/unblock-ip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message, 'success');
+      loadBlockedIps();
+    } else {
+      showToast(data.message || '操作失败', 'error');
+    }
+  } catch (e) {
+    showToast('解封失败: ' + e.message, 'error');
   }
 }
 

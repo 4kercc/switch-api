@@ -14,6 +14,7 @@ import { WebSocketServer } from 'ws';
 import config from '../config/config.js';
 import { getPublicDir } from '../utils/paths.js';
 import logger from '../utils/logger.js';
+import ipBlockManager from '../utils/ipBlockManager.js';
 import apiKeyManager from '../auth/apiKeyManager.js';
 import channelManager from '../utils/channelManager.js';
 import adminRouter from '../routes/admin.js';
@@ -26,12 +27,6 @@ const app = express();
 const publicDir = getPublicDir();
 
 app.disable('x-powered-by');
-
-// 基础中间件
-app.use(cors({ origin: true, credentials: true }));
-app.use(cookieParser());
-app.use(express.json({ limit: config.server.maxRequestSize }));
-app.use(express.static(publicDir));
 
 // 获取客户端真实 IP
 function getRealClientIP(req) {
@@ -47,15 +42,42 @@ function getRealClientIP(req) {
   return ip;
 }
 
-// 访问日志中间件
+// ==================== 全局 IP 封禁与黑名单拦截中间件 ====================
+app.use((req, res, next) => {
+  const clientIP = getRealClientIP(req);
+  req.clientIP = clientIP;
+  const status = ipBlockManager.check(clientIP);
+
+  if (status.blocked) {
+    if (status.reason === 'permanent') {
+      return res.status(403).json({ error: 'Access Denied: Your IP has been permanently blacklisted.' });
+    }
+    const remainingMinutes = Math.ceil((status.expiresAt - Date.now()) / 60000);
+    return res.status(429).json({ error: `Access Denied: Temporarily blocked for ${remainingMinutes} minutes.` });
+  }
+  next();
+});
+
+// 基础中间件
+app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
+app.use(express.json({ limit: config.server.maxRequestSize }));
+app.use(express.static(publicDir));
+
+// 访问日志中间件（自动监控 502/404 等并累加违规记录）
 app.use((req, res, next) => {
   const ignore = ['/favicon.ico', '/ws/logs'];
   const fullPath = req.originalUrl.split('?')[0];
   if (!ignore.some(p => fullPath.startsWith(p))) {
     const start = Date.now();
     res.on('finish', () => {
-      const clientIp = getRealClientIP(req);
+      const clientIp = req.clientIP || getRealClientIP(req);
       logger.request(req.method, fullPath, res.statusCode, Date.now() - start, clientIp, res.locals.tokenUsage, res.locals.channelName, res.locals.model);
+
+      // 如果响应码为 502 或 500 等异常，记录违规
+      if (res.statusCode >= 500) {
+        ipBlockManager.recordViolation(clientIp, `HTTP_${res.statusCode}`, 1).catch(() => {});
+      }
     });
   }
   next();
@@ -111,6 +133,8 @@ app.use(async (req, res, next) => {
 
   const { valid, keyInfo } = apiKeyManager.validateKey(providedKey);
   if (!valid) {
+    const clientIP = req.clientIP || getRealClientIP(req);
+    ipBlockManager.recordViolation(clientIP, 'auth_fail', 1).catch(() => {});
     return res.status(401).json({ error: 'Invalid API Key' });
   }
 
@@ -190,8 +214,10 @@ app.post('/api/check-usage', (req, res) => {
   });
 });
 
-// 404
+// 404 处理
 app.use((req, res) => {
+  const clientIP = req.clientIP || getRealClientIP(req);
+  ipBlockManager.recordViolation(clientIP, '404_not_found', 1).catch(() => {});
   res.status(404).json({ error: 'Not Found', path: req.path });
 });
 
