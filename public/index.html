@@ -3,319 +3,425 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>API 聚合与多渠道分流管理控制台</title>
+  <title>API 聚合与多渠道分流网关</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
-  <!-- Toast 消息提示容器 -->
+  <!-- Toast 消息容器 -->
   <div id="toast-container"></div>
 
-  <!-- 1. 登录表单遮罩 -->
-  <div id="loginView" style="display: flex; height: 100vh; align-items: center; justify-content: center; background: #0f172a;">
-    <div style="background: #ffffff; padding: 32px 36px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
-      <h2 style="font-size: 1.35rem; margin-bottom: 8px; text-align: center; color: #1e293b;">⚡ API 聚合分流网关</h2>
-      <p style="font-size: 0.85rem; color: #64748b; text-align: center; margin-bottom: 24px;">请输入管理员账号与密码登录控制台</p>
+  <!-- 1. 登录表单遮罩 (shadcn 简约卡片设计) -->
+  <div id="loginView" style="display: flex; min-height: 100vh; align-items: center; justify-content: center; background: #fafafa; padding: 1.5rem;">
+    <div style="background: #ffffff; padding: 2.5rem; border-radius: 0.75rem; border: 1px solid var(--border); width: 100%; max-width: 380px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: #18181b; color: #fff; border-radius: 8px; margin-bottom: 0.75rem;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <h2 style="font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; color: var(--foreground);">API 聚合分流网关</h2>
+        <p style="font-size: 0.825rem; color: var(--muted-foreground); margin-top: 0.25rem;">输入管理员凭据登录管理控制台</p>
+      </div>
       
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group">
-          <label>管理员账号</label>
-          <input type="text" id="loginUsername" placeholder="默认: admin" required autocomplete="username">
+          <label class="form-label">管理员账号</label>
+          <input type="text" id="loginUsername" class="form-input" placeholder="默认: admin" required autocomplete="username">
         </div>
-        <div class="form-group">
-          <label>管理员密码</label>
-          <input type="password" id="loginPassword" placeholder="请输入密码" required autocomplete="current-password">
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+          <label class="form-label">管理员密码</label>
+          <input type="password" id="loginPassword" class="form-input" placeholder="请输入密码" required autocomplete="current-password">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px; font-weight: bold; margin-top: 8px;">🔐 登 录</button>
+        <button type="submit" class="btn btn-primary" style="width: 100%; height: 40px; font-weight: 600;">
+          <span>登录控制台</span>
+        </button>
       </form>
     </div>
   </div>
 
-  <!-- 2. 主控制台主界面 (登录后展示) -->
-  <div id="dashboardView" class="app-container hidden">
-    <!-- 侧边栏导航 -->
-    <aside class="sidebar">
+  <!-- 2. 主控制台 (shadcn App Shell 响应式布局) -->
+  <div id="dashboardView" class="app-layout hidden">
+    <!-- 侧边栏 (Sidebar) -->
+    <aside class="app-sidebar" id="appSidebar">
       <div class="sidebar-header">
-        <span>🔀</span> API 聚合分流
+        <div class="sidebar-logo">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <span>API 聚合网关</span>
       </div>
+
       <nav class="sidebar-nav">
-        <div class="nav-item active" data-tab="tab-overview" onclick="switchTab('tab-overview')">
-          <span>📊</span> 实时看板与日志
+        <div class="nav-link active" data-tab="tab-overview" onclick="switchTab('tab-overview')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          <span>实时看板与日志</span>
         </div>
-        <div class="nav-item" data-tab="tab-channels" onclick="switchTab('tab-channels')">
-          <span>🔀</span> 外部渠道分流
+
+        <div class="nav-link" data-tab="tab-channels" onclick="switchTab('tab-channels')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M18 6a9 9 0 0 1-9 9H6"/><path d="M15 6h3v3"/></svg>
+          <span>外部渠道分流</span>
         </div>
-        <div class="nav-item" data-tab="tab-keys" onclick="switchTab('tab-keys')">
-          <span>🔑</span> API 密钥管理
+
+        <div class="nav-link" data-tab="tab-keys" onclick="switchTab('tab-keys')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+          <span>API 密钥管理</span>
         </div>
-        <div class="nav-item" data-tab="tab-stats" onclick="switchTab('tab-stats')">
-          <span>📈</span> 使用记录 (统计看板)
+
+        <div class="nav-link" data-tab="tab-stats" onclick="switchTab('tab-stats')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <span>使用记录 (统计)</span>
         </div>
-        <div class="nav-item" data-tab="tab-settings" onclick="switchTab('tab-settings')">
-          <span>⚙️</span> 系统与 SSL 设置
+
+        <div class="nav-link" data-tab="tab-settings" onclick="switchTab('tab-settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>系统与安全配置</span>
         </div>
       </nav>
+
       <div class="sidebar-footer">
-        <span id="currentUserSpan">admin</span>
-        <button class="btn btn-xs btn-secondary" onclick="handleLogout()">退出</button>
+        <div class="user-profile">
+          <div class="user-avatar" id="currentUserAvatar">A</div>
+          <span id="currentUserSpan">admin</span>
+        </div>
+        <button class="btn btn-ghost btn-xs" onclick="handleLogout()" title="退出登录">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        </button>
       </div>
     </aside>
 
-    <!-- 主内容区 -->
-    <main class="main-content">
-      
-      <!-- Tab 1: 实时看板与日志 (默认首屏) -->
-      <section id="tab-overview" class="tab-pane active">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h2 style="font-size: 1.3rem;">📊 运行概览与实时请求流</h2>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-sm btn-secondary" onclick="loadStats()">🔄 刷新数据</button>
-            <button class="btn btn-sm btn-danger" onclick="clearLogs()">🗑️ 清空日志</button>
-          </div>
+    <!-- 主工作区 (Main Content) -->
+    <div class="app-main">
+      <!-- 顶部 Header 面包屑/导航栏 -->
+      <header class="app-header">
+        <div class="header-left">
+          <button class="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Toggle Menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          </button>
+          <span class="page-title" id="pageHeaderTitle">实时看板与日志</span>
         </div>
 
-        <!-- 统计面板 -->
-        <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-label">运行时间 (Uptime)</span>
-            <span class="stat-val" id="statUptime">-</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">活跃渠道 / 总渠道</span>
-            <span class="stat-val" id="statChannels">-</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">累计处理请求</span>
-            <span class="stat-val" id="statRequests">-</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">累计消耗 Tokens</span>
-            <span class="stat-val" id="statTokens">-</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">内存占用 (RSS)</span>
-            <span class="stat-val" id="statMemory">-</span>
-          </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="badge badge-success" style="display: inline-flex; align-items: center; gap: 4px;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+            <span>Gateway 8046</span>
+          </span>
         </div>
+      </header>
 
-        <!-- 实时终端日志流 -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <h4 style="font-size: 0.95rem; color: #475569;">🟢 实时请求监控终端 (WebSocket 已连接)</h4>
-          <span style="font-size: 0.8rem; color: #94a3b8;">自动向下滚动</span>
-        </div>
-        <div id="consoleContainer" class="console-box">
-          <div class="log-line" style="color: #64748b;">[系统准备就绪] 正在等待请求接入...</div>
-        </div>
-      </section>
+      <div class="page-container">
 
-      <!-- Tab 2: 外部渠道分流管理 -->
-      <section id="tab-channels" class="tab-pane">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div>
-            <h2 style="font-size: 1.3rem;">🔀 外部上游渠道分流</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
-              支持为每个上游账号绑定独立的本地路由前缀（如 <code>/v2</code>、<code>/v3</code>、<code>/vip</code>、<code>/fast</code>），或留空参与全局轮询。
-            </p>
-          </div>
-          <button class="btn btn-success" onclick="openAddChannelModal()">➕ 添加外部渠道</button>
-        </div>
-
-        <div id="channelsContainer" style="display: flex; flex-direction: column; gap: 12px;">
-          <div style="text-align: center; color: #94a3b8; padding: 40px;">正在加载渠道列表...</div>
-        </div>
-      </section>
-
-      <!-- Tab 3: API Key 管理 (表格化管理、Token上限熔断阈值、复制/编辑/删除) -->
-      <section id="tab-keys" class="tab-pane">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div>
-            <h2 style="font-size: 1.3rem;">🔑 API 访问密钥管理</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
-              客户端在调用 <code>/v1/chat/completions</code>、<code>/v2/...</code> 或自定义分流接口时，需携带有效密钥进行鉴权。支持单独设置 Token 消耗上限阈值。
-            </p>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-success" onclick="openAddKeyModal()">➕ 新建 API 密钥</button>
-            <button class="btn btn-secondary" onclick="loadApiKeys()">🔄 刷新</button>
-          </div>
-        </div>
-
-        <!-- 概览徽章 -->
-        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
-          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 16px; font-size: 0.88rem;">
-            密钥总数: <b id="keyStatTotal" style="color: var(--primary);">0</b>
-          </div>
-          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 16px; font-size: 0.88rem;">
-            已启用: <b id="keyStatEnabled" style="color: #10b981;">0</b>
-          </div>
-        </div>
-
-        <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; overflow-x: auto;">
-          <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 0.9rem;">
-            <thead>
-              <tr style="border-bottom: 2px solid var(--border-color); text-align: left; color: #64748b;">
-                <th style="padding: 10px;">名称</th>
-                <th style="padding: 10px;">API 密钥 (Key)</th>
-                <th style="padding: 10px;">状态</th>
-                <th style="padding: 10px;">已用请求数</th>
-                <th style="padding: 10px;">累计 Token 消耗 / 上限阈值</th>
-                <th style="padding: 10px;">创建 / 最后使用</th>
-                <th style="padding: 10px; text-align: right;">操作</th>
-              </tr>
-            </thead>
-            <tbody id="apiKeysTableBody">
-              <tr>
-                <td colspan="7" style="text-align: center; padding: 30px; color: #94a3b8;">正在加载密钥列表...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Tab 4: 使用记录 (统计看板与模型维度分析) -->
-      <section id="tab-stats" class="tab-pane">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div>
-            <h2 style="font-size: 1.3rem;">📈 API 密钥使用记录与统计看板</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
-              按 API Key 筛选查看请求频次、输入/输出 Token 构成、占比分析与各模型调用分布。
-            </p>
-          </div>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <select id="statsApiKeySelect" onchange="renderStatsDashboard()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
-              <option value="all">全部 API 密钥</option>
-            </select>
-            <button class="btn btn-secondary btn-sm" onclick="loadApiKeys()">🔄 刷新统计</button>
-          </div>
-        </div>
-
-        <!-- 四大核心指标概览 -->
-        <div class="stats-grid" style="margin-bottom: 20px;">
-          <div class="stat-card">
-            <span class="stat-label">总请求次数</span>
-            <span class="stat-val" id="dashTotalRequests" style="color: var(--primary);">0</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Input Tokens (输入)</span>
-            <span class="stat-val" id="dashInputTokens" style="color: #10b981;">0</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Output Tokens (输出)</span>
-            <span class="stat-val" id="dashOutputTokens" style="color: #f59e0b;">0</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Total Tokens (总量)</span>
-            <span class="stat-val" id="dashTotalTokens" style="color: #3b82f6;">0</span>
-          </div>
-        </div>
-
-        <!-- 各 Key 消费明细及进度条占比列表 -->
-        <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 18px; margin-bottom: 24px; overflow-x: auto;">
-          <h4 style="margin-bottom: 12px; font-size: 1rem; color: #1e293b;">📊 API 密钥消耗明细与占比</h4>
-          <table style="width: 100%; min-width: 700px; border-collapse: collapse; font-size: 0.9rem;">
-            <thead>
-              <tr style="border-bottom: 2px solid var(--border-color); text-align: left; color: #64748b;">
-                <th style="padding: 10px;">API 密钥</th>
-                <th style="padding: 10px;">请求数</th>
-                <th style="padding: 10px;">输入 Tokens</th>
-                <th style="padding: 10px;">输出 Tokens</th>
-                <th style="padding: 10px;">总 Tokens</th>
-                <th style="padding: 10px;">占比 (Total Tokens)</th>
-              </tr>
-            </thead>
-            <tbody id="statsTableBody">
-              <tr>
-                <td colspan="6" style="text-align: center; padding: 24px; color: #94a3b8;">暂无数据</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- 公开使用量自查说明 -->
-        <div style="background: rgba(79, 70, 229, 0.05); border: 1px dashed rgba(79, 70, 229, 0.3); border-radius: 8px; padding: 14px 18px;">
-          <h4 style="font-size: 0.92rem; color: var(--primary); margin-bottom: 4px;">💡 公开使用量查询端点 (Client Self-Check API)</h4>
-          <p style="font-size: 0.85rem; color: #475569;">
-            客户端或第三方系统可向 <code>POST /api/check-usage</code> 发送 <code>{"key": "sk-..."}</code> 查询当前 Key 的剩余额度、消耗进度与模型分布。
-          </p>
-        </div>
-      </section>
-
-      <!-- Tab 5: 系统与 SSL 设置 -->
-      <section id="tab-settings" class="tab-pane">
-        <div style="max-width: 720px;">
-          <h2 style="font-size: 1.3rem; margin-bottom: 16px;">⚙️ 系统与 SSL 域名配置</h2>
-
-          <!-- 基础设置 -->
-          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-            <h4 style="margin-bottom: 14px; font-size: 1rem;">🖥️ 服务端口与代理设置</h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-              <div class="form-group">
-                <label>监听端口 (PORT)</label>
-                <input type="number" id="cfgPort" placeholder="8046">
+        <!-- Tab 1: 实时看板与终端日志 -->
+        <section id="tab-overview" class="tab-pane active">
+          <!-- 统计指标网格 (shadcn stat box) -->
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="stat-header">
+                <span>运行时间 (Uptime)</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               </div>
-              <div class="form-group">
-                <label>监听地址 (HOST)</label>
-                <input type="text" id="cfgHost" placeholder="0.0.0.0">
+              <div class="stat-value" id="statUptime">-</div>
+              <div class="stat-sub">服务稳定运行中</div>
+            </div>
+
+            <div class="stat-box">
+              <div class="stat-header">
+                <span>活跃渠道 / 总数</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M18 6a9 9 0 0 1-9 9H6"/></svg>
               </div>
+              <div class="stat-value" id="statChannels">-</div>
+              <div class="stat-sub">支持动态路径分流</div>
             </div>
-            <div class="form-group">
-              <label>SOCKS5 上游代理 (例如: socks5://127.0.0.1:40000)</label>
-              <input type="text" id="cfgProxy" placeholder="留空则直连">
+
+            <div class="stat-box">
+              <div class="stat-header">
+                <span>累计请求次数</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m22 2-7 20-4-9-9-4Z"/></svg>
+              </div>
+              <div class="stat-value" id="statRequests">-</div>
+              <div class="stat-sub">原子化并发处理</div>
             </div>
-            <div class="form-group">
-              <label>HTTPS 开关 (SSL)</label>
-              <select id="cfgSSL">
-                <option value="false">关闭 (使用普通 HTTP)</option>
-                <option value="true">开启 (启用 HTTPS 原生加密)</option>
-              </select>
+
+            <div class="stat-box">
+              <div class="stat-header">
+                <span>累计 Token 消耗</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div class="stat-value" id="statTokens">-</div>
+              <div class="stat-sub">按模型维度精准累计</div>
             </div>
-            <button class="btn btn-primary" onclick="saveSystemConfig()">💾 保存服务配置</button>
+
+            <div class="stat-box">
+              <div class="stat-header">
+                <span>内存占用 (RSS)</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/></svg>
+              </div>
+              <div class="stat-value" id="statMemory">-</div>
+              <div class="stat-sub">轻量低功耗常驻</div>
+            </div>
           </div>
 
-          <!-- SSL 证书申请 -->
-          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-            <h4 style="margin-bottom: 14px; font-size: 1rem;">🔒 域名与 SSL 自动证书</h4>
-            <div class="form-group">
-              <label>绑定域名 (Domain)</label>
-              <input type="text" id="cfgDomain" placeholder="例如: api.yourdomain.com">
-            </div>
-            <div id="certStatusInfo" style="font-size: 0.85rem; color: #64748b; margin-bottom: 12px;">正在检测证书状态...</div>
-            <button class="btn btn-success" onclick="issueCert()">🚀 一键申请/更新 ACME 证书</button>
-          </div>
-
-          <!-- IP 黑名单与安全防护面板 -->
-          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+          <!-- 实时终端监控卡片 -->
+          <div class="ui-card">
+            <div class="ui-card-header">
               <div>
-                <h4 style="font-size: 1rem; color: #1e293b; margin:0;">🛡️ IP 封禁与黑名单防御</h4>
-                <p style="font-size:0.8rem; color:#64748b; margin-top:2px;">连续 30 次异常自动封禁 60 分钟，连续 3 次失败自动永久拉黑。</p>
+                <div class="ui-card-title">实时请求流监控终端</div>
+                <div class="ui-card-description">通过 WebSocket 实时推流。点击日志中的任意 IP 可快捷拉黑或临时封禁。</div>
               </div>
-              <button class="btn btn-danger btn-sm" onclick="openManualBlockModal()">➕ 手动拉黑 IP</button>
+              <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-outline btn-sm" onclick="loadStats()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                  <span>刷新</span>
+                </button>
+                <button class="btn btn-destructive btn-sm" onclick="clearLogs()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  <span>清空</span>
+                </button>
+              </div>
             </div>
+            <div class="ui-card-content" style="padding-top: 0;">
+              <div id="consoleContainer" class="terminal-box">
+                <div class="log-entry" style="color: #71717a;">[系统就绪] WebSocket 连接已建立，等待请求接入...</div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-            <div style="overflow-x: auto;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+        <!-- Tab 2: 外部渠道分流管理 -->
+        <section id="tab-channels" class="tab-pane">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 600; letter-spacing: -0.01em;">外部上游渠道分流</h3>
+              <p style="font-size: 0.825rem; color: var(--muted-foreground); margin-top: 0.2rem;">
+                支持绑定专属本地路径（如 <code>/v2</code>、<code>/vip</code>、<code>/fast</code>）实现精准隔离，并支持默认降级模型自愈。
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="openAddChannelModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+              <span>添加外部渠道</span>
+            </button>
+          </div>
+
+          <div id="channelsContainer">
+            <div style="text-align: center; color: var(--muted-foreground); padding: 3rem;">正在加载渠道列表...</div>
+          </div>
+        </section>
+
+        <!-- Tab 3: API 密钥管理 -->
+        <section id="tab-keys" class="tab-pane">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 600; letter-spacing: -0.01em;">API 访问密钥管理</h3>
+              <p style="font-size: 0.825rem; color: var(--muted-foreground); margin-top: 0.2rem;">
+                管理客户端调用的 Bearer Key，支持设定 Token 上限阈值（达到上限自动熔断）。
+              </p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-primary" onclick="openAddKeyModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                <span>新建 API 密钥</span>
+              </button>
+              <button class="btn btn-outline" onclick="loadApiKeys()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                <span>刷新</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 徽章计数 -->
+          <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+            <div class="badge badge-secondary" style="padding: 0.35rem 0.75rem;">
+              <span>密钥总数: </span><b id="keyStatTotal" style="margin-left: 4px; color: var(--foreground);">0</b>
+            </div>
+            <div class="badge badge-success" style="padding: 0.35rem 0.75rem;">
+              <span>已启用: </span><b id="keyStatEnabled" style="margin-left: 4px;">0</b>
+            </div>
+          </div>
+
+          <!-- 表格 -->
+          <div class="table-wrapper">
+            <table class="ui-table">
+              <thead>
+                <tr>
+                  <th>名称</th>
+                  <th>API 密钥 (Key)</th>
+                  <th>状态</th>
+                  <th>已用请求数</th>
+                  <th>累计 Token / 上限阈值</th>
+                  <th>创建 / 最后使用</th>
+                  <th style="text-align: right;">操作</th>
+                </tr>
+              </thead>
+              <tbody id="apiKeysTableBody">
+                <tr>
+                  <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--muted-foreground);">正在加载密钥...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Tab 4: 使用记录 (统计看板) -->
+        <section id="tab-stats" class="tab-pane">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 600; letter-spacing: -0.01em;">API 密钥使用记录</h3>
+              <p style="font-size: 0.825rem; color: var(--muted-foreground); margin-top: 0.2rem;">
+                输入/输出 Token 构成、占比分析与各模型调用分布。
+              </p>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <select id="statsApiKeySelect" class="form-select" onchange="renderStatsDashboard()" style="width: auto; min-width: 180px;">
+                <option value="all">全部 API 密钥</option>
+              </select>
+              <button class="btn btn-outline btn-sm" onclick="loadApiKeys()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                <span>刷新</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 四大指标卡片 -->
+          <div class="stats-grid" style="margin-bottom: 1.25rem;">
+            <div class="stat-box">
+              <div class="stat-header"><span>总请求次数</span></div>
+              <div class="stat-value" id="dashTotalRequests" style="color: var(--foreground);">0</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-header"><span>Input Tokens (输入)</span></div>
+              <div class="stat-value" id="dashInputTokens" style="color: #059669;">0</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-header"><span>Output Tokens (输出)</span></div>
+              <div class="stat-value" id="dashOutputTokens" style="color: #d97706;">0</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-header"><span>Total Tokens (总量)</span></div>
+              <div class="stat-value" id="dashTotalTokens" style="color: #2563eb;">0</div>
+            </div>
+          </div>
+
+          <!-- 消费明细表格 -->
+          <div class="ui-card">
+            <div class="ui-card-header">
+              <div class="ui-card-title">各密钥消耗明细与占比</div>
+            </div>
+            <div class="ui-card-content" style="padding: 0;">
+              <table class="ui-table">
                 <thead>
-                  <tr style="border-bottom: 2px solid var(--border-color); text-align: left; color: #64748b;">
-                    <th style="padding: 8px;">IP 地址</th>
-                    <th style="padding: 8px;">封禁类型</th>
-                    <th style="padding: 8px;">剩余时间 / 状态</th>
-                    <th style="padding: 8px;">累计触发次数</th>
-                    <th style="padding: 8px; text-align: right;">操作</th>
+                  <tr>
+                    <th>API 密钥</th>
+                    <th>请求数</th>
+                    <th>输入 Tokens</th>
+                    <th>输出 Tokens</th>
+                    <th>总 Tokens</th>
+                    <th>消耗占比</th>
                   </tr>
                 </thead>
-                <tbody id="blockedIpsTableBody">
+                <tbody id="statsTableBody">
                   <tr>
-                    <td colspan="5" style="text-align: center; padding: 20px; color: #94a3b8;">暂无被封禁的 IP</td>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--muted-foreground);">暂无统计数据</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-      </section>
 
-    </main>
+          <div style="background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; font-size: 0.825rem; color: var(--muted-foreground);">
+            <strong style="color: var(--foreground);">💡 客户端自查端点 (Public API):</strong>
+            向 <code>POST /api/check-usage</code> 发送 <code>{"key": "sk-..."}</code> 即可安全免密自查该密钥的额度进度与模型明细。
+          </div>
+        </section>
+
+        <!-- Tab 5: 系统与安全配置 -->
+        <section id="tab-settings" class="tab-pane">
+          <div style="max-width: 760px;">
+            <h3 style="font-size: 1.15rem; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 1.25rem;">系统与安全防护配置</h3>
+
+            <!-- 服务端设置卡片 -->
+            <div class="ui-card">
+              <div class="ui-card-header">
+                <div class="ui-card-title">服务端口与上游网络代理</div>
+              </div>
+              <div class="ui-card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                  <div class="form-group">
+                    <label class="form-label">监听端口 (PORT)</label>
+                    <input type="number" id="cfgPort" class="form-input" placeholder="8046">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">监听地址 (HOST)</label>
+                    <input type="text" id="cfgHost" class="form-input" placeholder="0.0.0.0">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">SOCKS5 上游代理 (例如: socks5://127.0.0.1:40000)</label>
+                  <input type="text" id="cfgProxy" class="form-input" placeholder="留空代表直接连接上游">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label">HTTPS 加密传输 (SSL)</label>
+                  <select id="cfgSSL" class="form-select">
+                    <option value="false">关闭 (使用普通 HTTP 模式)</option>
+                    <option value="true">开启 (启用 HTTPS 原生加密传输)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="ui-card-footer">
+                <button class="btn btn-primary" onclick="saveSystemConfig()">保存服务配置</button>
+              </div>
+            </div>
+
+            <!-- SSL 证书卡片 -->
+            <div class="ui-card">
+              <div class="ui-card-header">
+                <div class="ui-card-title">域名与 SSL 自动证书 (ACME.sh)</div>
+              </div>
+              <div class="ui-card-content">
+                <div class="form-group">
+                  <label class="form-label">绑定域名 (Domain)</label>
+                  <input type="text" id="cfgDomain" class="form-input" placeholder="例如: api.yourdomain.com">
+                </div>
+                <div id="certStatusInfo" style="font-size: 0.825rem; color: var(--muted-foreground);">正在检测证书状态...</div>
+              </div>
+              <div class="ui-card-footer">
+                <button class="btn btn-outline" onclick="issueCert()">一键申请/更新证书</button>
+              </div>
+            </div>
+
+            <!-- IP 封禁与防御卡片 -->
+            <div class="ui-card">
+              <div class="ui-card-header">
+                <div>
+                  <div class="ui-card-title">IP 封禁与黑名单防御</div>
+                  <div class="ui-card-description">连续 30 次异常自动封禁 60 分钟，连续 3 次封禁自动升级永久黑名单。</div>
+                </div>
+                <button class="btn btn-destructive btn-sm" onclick="openManualBlockModal()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" x2="19.07" y1="4.93" y2="19.07"/></svg>
+                  <span>手动封禁 IP</span>
+                </button>
+              </div>
+              <div class="ui-card-content" style="padding: 0;">
+                <table class="ui-table">
+                  <thead>
+                    <tr>
+                      <th>IP 地址</th>
+                      <th>封禁类型</th>
+                      <th>剩余时间 / 状态</th>
+                      <th>累计次数</th>
+                      <th style="text-align: right;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="blockedIpsTableBody">
+                    <tr>
+                      <td colspan="5" style="text-align: center; padding: 2rem; color: var(--muted-foreground);">暂无封禁 IP</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+    </div>
   </div>
 
   <script src="/js/app.js"></script>

@@ -1,17 +1,28 @@
 /**
- * 控制台前端交互、WebSocket 日志流与各模块逻辑
+ * shadcn/ui 风格现代化前端控制器
  */
 
 // Toast 提示
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = message;
+  toast.className = `ui-toast ${type}`;
+  
+  let iconSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>';
+  if (type === 'success') {
+    iconSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+  } else if (type === 'error') {
+    iconSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>';
+  }
+
+  toast.innerHTML = `${iconSvg}<span>${escapeHtml(message)}</span>`;
   container.appendChild(toast);
+
   setTimeout(() => {
     toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 300);
+    toast.style.transform = 'translateY(-8px)';
+    toast.style.transition = 'all 0.2s ease';
+    setTimeout(() => toast.remove(), 200);
   }, 3000);
 }
 
@@ -23,7 +34,7 @@ async function authFetch(url, options = {}) {
   });
   if (res.status === 401) {
     showLoginView();
-    showToast('登录已过期，请重新登录', 'warning');
+    showToast('登录状态失效，请重新登录', 'warning');
     throw new Error('Unauthorized');
   }
   return res;
@@ -45,6 +56,24 @@ function generateRandomPathPrefix() {
   return `/${word}-${randStr}`;
 }
 
+// ==================== 响应式侧边栏切换 ====================
+
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('appSidebar');
+  sidebar.classList.toggle('open');
+}
+
+// 点击遮罩自动收起
+document.addEventListener('click', (e) => {
+  const sidebar = document.getElementById('appSidebar');
+  const menuBtn = document.querySelector('.mobile-menu-btn');
+  if (sidebar && sidebar.classList.contains('open')) {
+    if (!sidebar.contains(e.target) && (!menuBtn || !menuBtn.contains(e.target))) {
+      sidebar.classList.remove('open');
+    }
+  }
+});
+
 // ==================== 登录与页面初始化 ====================
 
 function showLoginView() {
@@ -56,11 +85,11 @@ function showDashboardView(username = 'admin') {
   document.getElementById('loginView').style.display = 'none';
   document.getElementById('dashboardView').classList.remove('hidden');
   document.getElementById('currentUserSpan').textContent = username;
+  document.getElementById('currentUserAvatar').textContent = username.substring(0, 1).toUpperCase();
   
-  // 初始化加载所有核心数据
   loadStats();
   loadChannels();
-  loadKeys();
+  loadApiKeys();
   loadConfig();
   connectWebSocket();
 }
@@ -112,13 +141,31 @@ async function handleLogout() {
   showToast('已退出登录', 'info');
 }
 
+const TAB_TITLES = {
+  'tab-overview': '实时看板与日志',
+  'tab-channels': '外部上游渠道分流',
+  'tab-keys': 'API 访问密钥管理',
+  'tab-stats': '使用记录与统计分析',
+  'tab-settings': '系统与安全配置'
+};
+
 function switchTab(tabId) {
-  document.querySelectorAll('.nav-item').forEach(el => {
+  document.querySelectorAll('.nav-link').forEach(el => {
     el.classList.toggle('active', el.dataset.tab === tabId);
   });
   document.querySelectorAll('.tab-pane').forEach(el => {
     el.classList.toggle('active', el.id === tabId);
   });
+
+  const headerTitle = document.getElementById('pageHeaderTitle');
+  if (headerTitle && TAB_TITLES[tabId]) {
+    headerTitle.textContent = TAB_TITLES[tabId];
+  }
+
+  const sidebar = document.getElementById('appSidebar');
+  if (sidebar && sidebar.classList.contains('open')) {
+    sidebar.classList.remove('open');
+  }
 
   if (tabId === 'tab-overview') loadStats();
   if (tabId === 'tab-channels') loadChannels();
@@ -181,19 +228,19 @@ function appendConsoleLog(log) {
   if (!box) return;
 
   const line = document.createElement('div');
-  line.className = 'log-line';
+  line.className = 'log-entry';
 
   if (log.type === 'request') {
-    const statusClass = log.status >= 500 ? 'log-s500' : (log.status >= 400 ? 'log-s400' : 'log-s200');
-    const chanTag = log.channelName ? `<span class="log-chan">[渠道: ${escapeHtml(log.channelName)}]</span> ` : '';
+    const statusClass = log.status >= 500 ? 'log-status-500' : (log.status >= 400 ? 'log-status-400' : 'log-status-200');
+    const chanTag = log.channelName ? `<span class="log-channel">[渠道: ${escapeHtml(log.channelName)}]</span> ` : '';
     const modelTag = log.model ? `<span class="log-model">[${escapeHtml(log.model)}]</span> ` : '';
-    const tokenInfo = log.usage ? ` <span style="color:#94a3b8;">| Tokens: In ${log.usage.prompt_tokens||0} / Out ${log.usage.completion_tokens||0}</span>` : '';
-    const ipHtml = `<span class="ip-link" onclick="promptBlockIp('${escapeHtml(log.ip)}')" title="点击快捷将该 IP 加入黑名单/封禁">${escapeHtml(log.ip)}</span>`;
+    const tokenInfo = log.usage ? ` <span style="color:#71717a;">| Tokens: In ${log.usage.prompt_tokens||0} / Out ${log.usage.completion_tokens||0}</span>` : '';
+    const ipHtml = `<span class="ip-badge-link" onclick="promptBlockIp('${escapeHtml(log.ip)}')" title="点击快捷将该 IP 加入黑名单/封禁">${escapeHtml(log.ip)}</span>`;
 
-    line.innerHTML = `<span class="log-time">${log.time}</span> <span class="log-req">[${log.method}]</span> [${ipHtml}] - ${escapeHtml(log.url)} ${chanTag}${modelTag}<span class="${statusClass}">${log.status}</span> <span style="color:#64748b;">${log.duration}ms</span>${tokenInfo}`;
+    line.innerHTML = `<span class="log-time">${log.time}</span> <span class="log-method">[${log.method}]</span> [${ipHtml}] - ${escapeHtml(log.url)} ${chanTag}${modelTag}<span class="${statusClass}">${log.status}</span> <span style="color:#71717a;">${log.duration}ms</span>${tokenInfo}`;
   } else {
-    const color = log.type === 'error' ? '#ef4444' : (log.type === 'warn' ? '#f59e0b' : '#10b981');
-    line.innerHTML = `<span class="log-time">${log.time}</span> <span style="color:${color}; font-weight:bold;">[${log.type}]</span> ${escapeHtml(log.message)}`;
+    const color = log.type === 'error' ? '#f87171' : (log.type === 'warn' ? '#fbbf24' : '#34d399');
+    line.innerHTML = `<span class="log-time">${log.time}</span> <span style="color:${color}; font-weight:600;">[${log.type}]</span> ${escapeHtml(log.message)}`;
   }
 
   box.appendChild(line);
@@ -202,7 +249,7 @@ function appendConsoleLog(log) {
 
 async function clearLogs() {
   await authFetch('/admin/logs', { method: 'DELETE' });
-  document.getElementById('consoleContainer').innerHTML = '<div class="log-line" style="color: #64748b;">[已清空控制台日志]</div>';
+  document.getElementById('consoleContainer').innerHTML = '<div class="log-entry" style="color: #71717a;">[已清空控制台日志]</div>';
   showToast('日志已清空', 'info');
 }
 
@@ -220,7 +267,7 @@ async function loadChannels() {
       renderChannels(cachedChannels);
     }
   } catch (e) {
-    container.innerHTML = `<div style="color:#ef4444; padding:20px;">加���渠道失败: ${e.message}</div>`;
+    container.innerHTML = `<div style="color:#ef4444; padding:2rem; text-align:center;">加载渠道失败: ${e.message}</div>`;
   }
 }
 
@@ -228,10 +275,10 @@ function renderChannels(list) {
   const container = document.getElementById('channelsContainer');
   if (!list || list.length === 0) {
     container.innerHTML = `
-      <div style="text-align: center; padding: 40px; background: #fff; border: 1px dashed var(--border-color); border-radius: 8px; color: var(--text-muted);">
-        <p style="font-size: 1rem; margin-bottom: 8px;">暂未配置外部上游渠道</p>
-        <p style="font-size: 0.85rem; margin-bottom: 16px;">可添加多个第三方账号，并绑定专属分流路径（如 <code>/v2</code>、<code>/v3</code>、<code>/vip</code>）</p>
-        <button class="btn btn-success" onclick="openAddChannelModal()">➕ 添加第一个渠道</button>
+      <div style="text-align: center; padding: 3rem; background: #fff; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--muted-foreground);">
+        <p style="font-size: 0.95rem; font-weight: 500; margin-bottom: 0.25rem;">暂未配置外部上游渠道</p>
+        <p style="font-size: 0.825rem; margin-bottom: 1.25rem;">可添加多个第三方账号，并绑定专属分流路径（如 <code>/v2</code>、<code>/v3</code>、<code>/vip</code>）</p>
+        <button class="btn btn-primary btn-sm" onclick="openAddChannelModal()">➕ 添加第一个渠道</button>
       </div>
     `;
     return;
@@ -241,51 +288,46 @@ function renderChannels(list) {
     const isEnabled = c.enable !== false;
     const pathPrefix = c.pathPrefix ? (c.pathPrefix.startsWith('/') ? c.pathPrefix : '/' + c.pathPrefix) : '';
     const modelsText = (c.models && c.models.length > 0) ? c.models.join(', ') : '全部支持 (*)';
-    const defaultModelText = c.defaultModel ? c.defaultModel : '无 (保持原模型透传)';
+    const defaultModelText = c.defaultModel ? c.defaultModel : '无 (原模型透传)';
 
     return `
-      <div class="card-item">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span>${isEnabled ? '🟢' : '⚪'}</span>
-            <strong style="font-size: 1rem;">${escapeHtml(c.name)}</strong>
-            <span style="background: rgba(79, 70, 229, 0.1); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;">
-              ${(c.type || 'openai').toUpperCase()}
-            </span>
+      <div class="channel-card">
+        <div class="channel-card-top">
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="badge ${isEnabled ? 'badge-success' : 'badge-secondary'}">${isEnabled ? '已启用' : '已停用'}</span>
+            <strong style="font-size: 0.95rem; color: var(--foreground);">${escapeHtml(c.name)}</strong>
+            <span class="badge badge-outline">${(c.type || 'openai').toUpperCase()}</span>
             ${pathPrefix ? `
-              <span style="background: rgba(245, 158, 11, 0.15); color: #b45309; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; border: 1px dashed rgba(245, 158, 11, 0.4);">
-                🔀 分流路径: ${escapeHtml(pathPrefix)}
-              </span>
+              <span class="badge badge-warning">🔀 路径: ${escapeHtml(pathPrefix)}</span>
             ` : `
-              <span style="background: rgba(148, 163, 184, 0.15); color: #64748b; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
-                全局默认轮询
-              </span>
+              <span class="badge badge-secondary">全局轮询</span>
             `}
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <label class="switch" style="transform: scale(0.85);">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <label class="ui-switch" title="开启或关闭该渠道">
               <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="toggleChannel('${c.id}', this.checked)">
-              <span class="slider"></span>
+              <span class="ui-switch-slider"></span>
             </label>
-            <button class="btn btn-sm btn-secondary" onclick="testChannel('${c.id}')">⚡ 测速</button>
-            <button class="btn btn-sm btn-primary" onclick="openEditChannelModal('${c.id}')">✏️ 编辑</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteChannel('${c.id}', '${escapeHtml(c.name)}')">🗑️</button>
+            <button class="btn btn-outline btn-xs" onclick="testChannel('${c.id}')">⚡ 测速</button>
+            <button class="btn btn-secondary btn-xs" onclick="openEditChannelModal('${c.id}')">��️ 编辑</button>
+            <button class="btn btn-destructive btn-xs" onclick="deleteChannel('${c.id}', '${escapeHtml(c.name)}')">🗑️</button>
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
-          ${pathPrefix ? `
-            <div style="grid-column: 1 / -1; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-              <div><strong>📍 客户端专属分流端点:</strong> <code style="color: #b45309; font-weight: bold;">${escapeHtml(pathPrefix)}/chat/completions</code></div>
-              <button class="btn btn-xs btn-secondary" onclick="navigator.clipboard.writeText('${pathPrefix}/chat/completions'); showToast('已复制路径', 'info');">📋 复制</button>
-            </div>
-          ` : ''}
-          <div><strong>上游 Base URL:</strong> <code>${escapeHtml(c.baseUrl)}</code></div>
-          <div><strong>API Key:</strong> <code>${c.apiKeyMasked || '（免密）'}</code></div>
-          <div><strong>累计调用 / Token:</strong> <b>${c.totalRequests || 0} 次</b> / <b>${(c.totalTokens || 0).toLocaleString()}</b></div>
-          <div><strong>优先级:</strong> ${c.priority || 10}</div>
-          <div style="grid-column: 1 / -1;"><strong>支持模型:</strong> <span style="color:#059669;">${escapeHtml(modelsText)}</span></div>
-          <div style="grid-column: 1 / -1;"><strong>默认降级模型:</strong> <span style="color:#b45309; font-weight: bold;">${escapeHtml(defaultModelText)}</span></div>
+        ${pathPrefix ? `
+          <div style="background: var(--muted); padding: 0.5rem 0.75rem; border-radius: var(--radius); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; margin: 0.5rem 0; font-size: 0.825rem;">
+            <div><span style="color: var(--muted-foreground);">📍 专属调用端点:</span> <code style="color: #b45309; font-weight: 600;">${escapeHtml(pathPrefix)}/chat/completions</code></div>
+            <button class="btn btn-ghost btn-xs" onclick="navigator.clipboard.writeText('${pathPrefix}/chat/completions'); showToast('端点路径已复制', 'info');">📋 复制</button>
+          </div>
+        ` : ''}
+
+        <div class="channel-meta-grid">
+          <div><span style="color: var(--muted-foreground);">Base URL:</span> <code style="word-break: break-all;">${escapeHtml(c.baseUrl)}</code></div>
+          <div><span style="color: var(--muted-foreground);">API Key:</span> <code>${c.apiKeyMasked || '（免密）'}</code></div>
+          <div><span style="color: var(--muted-foreground);">累计请求 / Tokens:</span> <b>${c.totalRequests || 0} 次</b> / <b>${(c.totalTokens || 0).toLocaleString()}</b></div>
+          <div><span style="color: var(--muted-foreground);">优先级:</span> <b>${c.priority || 10}</b></div>
+          <div style="grid-column: 1 / -1;"><span style="color: var(--muted-foreground);">支持模型:</span> <span style="color: #059669; font-weight: 500;">${escapeHtml(modelsText)}</span></div>
+          <div style="grid-column: 1 / -1;"><span style="color: var(--muted-foreground);">默认降级模型:</span> <span style="color: #b45309; font-weight: 600;">${escapeHtml(defaultModelText)}</span></div>
         </div>
       </div>
     `;
@@ -294,45 +336,49 @@ function renderChannels(list) {
 
 function openAddChannelModal() {
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'ui-dialog-backdrop';
   modal.innerHTML = `
-    <div class="modal-content">
-      <div class="modal-title">➕ 添加外部上游渠道</div>
-      <div class="form-group">
-        <label>渠道名称</label>
-        <input type="text" id="addChanName" placeholder="例如: 斯巴达-1号 / mx.mk v2">
+    <div class="ui-dialog">
+      <div class="ui-dialog-header">
+        <div class="ui-dialog-title">添加外部上游渠道</div>
       </div>
-      <div class="form-group">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <label style="margin:0;">🔀 本地分流路径 (支持任意英文/版本号)</label>
-          <button type="button" class="btn btn-xs btn-secondary" id="randomAddPathBtn">🎲 随机生成</button>
+      <div class="ui-dialog-body">
+        <div class="form-group">
+          <label class="form-label">渠道名称</label>
+          <input type="text" id="addChanName" class="form-input" placeholder="例如: 斯巴达-1号 / mx.mk v2">
         </div>
-        <input type="text" id="addChanPath" placeholder="例如: /v2, /v3, /vip, /fast" style="margin-top:4px;">
-        <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">设置后客户端请求 <code>/xxx/chat/completions</code> 直接走此专属渠道；留空则参与全局轮询。</div>
+        <div class="form-group">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label class="form-label" style="margin:0;">本地分流路径 (支持任意英文/版本号)</label>
+            <button type="button" class="btn btn-outline btn-xs" id="randomAddPathBtn">🎲 随机生成</button>
+          </div>
+          <input type="text" id="addChanPath" class="form-input" placeholder="例如: /v2, /v3, /vip, /fast" style="margin-top:0.35rem;">
+          <div class="form-hint">客户端请求 <code>/xxx/chat/completions</code> 直接走此专属渠道；留空则参与全局轮询。</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">上游接口 Base URL *</label>
+          <input type="text" id="addChanBaseUrl" class="form-input" placeholder="例如: https://token.mx.mk/v2 或 http://127.0.0.1:8088/v1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">API Key (密钥，无密码可留空)</label>
+          <input type="password" id="addChanApiKey" class="form-input" placeholder="sk-...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">支持的模型列表 (英文逗号分隔，留空支持全部)</label>
+          <input type="text" id="addChanModels" class="form-input" placeholder="例如: gpt-4o, claude-3-7-sonnet">
+        </div>
+        <div class="form-group">
+          <label class="form-label">🛡️ 默认降级模型 (Default Model)</label>
+          <input type="text" id="addChanDefaultModel" class="form-input" placeholder="例如: gpt-5 (请求不受支持模型时自动降级)">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">优先级 (默认 10，数值越小越优先)</label>
+          <input type="number" id="addChanPriority" class="form-input" value="10" min="1" max="100">
+        </div>
       </div>
-      <div class="form-group">
-        <label>上游接口 Base URL *</label>
-        <input type="text" id="addChanBaseUrl" placeholder="例如: https://token.mx.mk/v2 或 http://127.0.0.1:8088/v1">
-      </div>
-      <div class="form-group">
-        <label>API Key (密钥，无密码可留空)</label>
-        <input type="password" id="addChanApiKey" placeholder="sk-...">
-      </div>
-      <div class="form-group">
-        <label>支持的模型列表 (英文逗号分隔，留空支持全部)</label>
-        <input type="text" id="addChanModels" placeholder="例如: gpt-4o, claude-3-7-sonnet">
-      </div>
-      <div class="form-group">
-        <label>🛡️ 默认降级模型 (Default Model)</label>
-        <input type="text" id="addChanDefaultModel" placeholder="例如: gpt-5 (当客户端请求不受支持的模型时自动转换为此模型)">
-      </div>
-      <div class="form-group">
-        <label>优先级 (默认 10，数值越小越优先)</label>
-        <input type="number" id="addChanPriority" value="10" min="1" max="100">
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
-        <button class="btn btn-success" id="confirmAddChanBtn">确认添加</button>
+      <div class="ui-dialog-footer">
+        <button class="btn btn-outline" onclick="this.closest('.ui-dialog-backdrop').remove()">取消</button>
+        <button class="btn btn-primary" id="confirmAddChanBtn">确认添加</button>
       </div>
     </div>
   `;
@@ -390,44 +436,48 @@ function openEditChannelModal(id) {
   if (!chan) return;
 
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'ui-dialog-backdrop';
   modal.innerHTML = `
-    <div class="modal-content">
-      <div class="modal-title">✏️ 编辑外部上游渠道配置</div>
-      <div class="form-group">
-        <label>渠道名称</label>
-        <input type="text" id="editChanName" value="${escapeHtml(chan.name || '')}">
+    <div class="ui-dialog">
+      <div class="ui-dialog-header">
+        <div class="ui-dialog-title">编辑外部上游渠道</div>
       </div>
-      <div class="form-group">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <label style="margin:0;">🔀 本地分流路径 (支持任意英文/版本号)</label>
-          <button type="button" class="btn btn-xs btn-secondary" id="randomEditPathBtn">🎲 随机生成</button>
+      <div class="ui-dialog-body">
+        <div class="form-group">
+          <label class="form-label">渠道名称</label>
+          <input type="text" id="editChanName" class="form-input" value="${escapeHtml(chan.name || '')}">
         </div>
-        <input type="text" id="editChanPath" value="${escapeHtml(chan.pathPrefix || '')}" placeholder="例如: /v2, /v3, /vip, /fast" style="margin-top:4px;">
+        <div class="form-group">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label class="form-label" style="margin:0;">本地分流路径 (支持任意英文/版本号)</label>
+            <button type="button" class="btn btn-outline btn-xs" id="randomEditPathBtn">🎲 随机生成</button>
+          </div>
+          <input type="text" id="editChanPath" class="form-input" value="${escapeHtml(chan.pathPrefix || '')}" placeholder="例如: /v2, /v3, /vip, /fast" style="margin-top:0.35rem;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">上游接口 Base URL *</label>
+          <input type="text" id="editChanBaseUrl" class="form-input" value="${escapeHtml(chan.baseUrl || '')}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">API Key (留空不修改)</label>
+          <input type="password" id="editChanApiKey" class="form-input" placeholder="如需修改请输入新Key，否则留空">
+        </div>
+        <div class="form-group">
+          <label class="form-label">支持的模型列表 (英文逗号分隔)</label>
+          <input type="text" id="editChanModels" class="form-input" value="${escapeHtml((chan.models || []).join(', '))}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">🛡️ 默认降级模型 (Default Model)</label>
+          <input type="text" id="editChanDefaultModel" class="form-input" value="${escapeHtml(chan.defaultModel || '')}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">优先级 (默认 10)</label>
+          <input type="number" id="editChanPriority" class="form-input" value="${chan.priority || 10}" min="1" max="100">
+        </div>
       </div>
-      <div class="form-group">
-        <label>上游接口 Base URL *</label>
-        <input type="text" id="editChanBaseUrl" value="${escapeHtml(chan.baseUrl || '')}">
-      </div>
-      <div class="form-group">
-        <label>API Key (留空不修改)</label>
-        <input type="password" id="editChanApiKey" placeholder="如需修改请输入新Key，否则留空">
-      </div>
-      <div class="form-group">
-        <label>支持的模型列表 (英文逗号分隔)</label>
-        <input type="text" id="editChanModels" value="${escapeHtml((chan.models || []).join(', '))}">
-      </div>
-      <div class="form-group">
-        <label>🛡️ 默认降级模型 (Default Model)</label>
-        <input type="text" id="editChanDefaultModel" value="${escapeHtml(chan.defaultModel || '')}">
-      </div>
-      <div class="form-group">
-        <label>优先级 (默认 10)</label>
-        <input type="number" id="editChanPriority" value="${chan.priority || 10}" min="1" max="100">
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
-        <button class="btn btn-primary" id="confirmEditChanBtn">💾 保存修改</button>
+      <div class="ui-dialog-footer">
+        <button class="btn btn-outline" onclick="this.closest('.ui-dialog-backdrop').remove()">取消</button>
+        <button class="btn btn-primary" id="confirmEditChanBtn">保存修改</button>
       </div>
     </div>
   `;
@@ -512,7 +562,7 @@ async function testChannel(id) {
   }
 }
 
-// ==================== API Key 管理与统计看板 (完整移植) ====================
+// ==================== API Key 管理与统计看板 ====================
 
 let globalApiKeysData = { keys: [], stats: {} };
 
@@ -540,7 +590,7 @@ function renderApiKeysTable() {
 
   const keys = globalApiKeysData.keys || [];
   if (keys.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">暂无 API 密钥，点击右上角新建</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--muted-foreground);">暂无 API 密钥，点击右上角新建</td></tr>`;
     return;
   }
 
@@ -568,39 +618,39 @@ function renderApiKeysTable() {
       : k.key;
 
     return `
-      <tr style="border-bottom: 1px solid var(--border-color);">
-        <td style="padding: 10px; font-weight: bold; white-space: nowrap;">
+      <tr>
+        <td style="font-weight: 600;">
           ${escapeHtml(k.name)}
-          ${isExceeded ? '<span style="font-size: 0.72rem; background: #ef4444; color: #fff; padding: 1px 6px; border-radius: 4px; margin-left: 4px;">额度已耗尽</span>' : ''}
+          ${isExceeded ? '<span class="badge badge-danger" style="margin-left: 4px;">额度已耗尽</span>' : ''}
         </td>
-        <td style="padding: 10px; font-family: monospace; white-space: nowrap;">
+        <td style="font-family: var(--font-mono); font-size: 0.825rem;">
           <code title="${escapeHtml(k.key)}">${escapeHtml(keyDisplay)}</code>
-          <button class="btn btn-xs btn-secondary" onclick="navigator.clipboard.writeText('${escapeHtml(k.key)}'); showToast('密钥已复制', 'info');" style="margin-left: 4px;" title="复制完整 Key">📋</button>
+          <button class="btn btn-ghost btn-xs" onclick="navigator.clipboard.writeText('${escapeHtml(k.key)}'); showToast('密钥已复制', 'info');" style="margin-left: 4px;" title="复制完整 Key">📋</button>
         </td>
-        <td style="padding: 10px; white-space: nowrap;">
-          <label class="switch" style="transform: scale(0.8); transform-origin: left center;">
+        <td>
+          <label class="ui-switch">
             <input type="checkbox" ${k.enabled ? 'checked' : ''} onchange="toggleApiKeyEnabled('${k.id}', this.checked)">
-            <span class="slider"></span>
+            <span class="ui-switch-slider"></span>
           </label>
         </td>
-        <td style="padding: 10px; white-space: nowrap;">${requests.toLocaleString()} 次</td>
-        <td style="padding: 10px; white-space: nowrap;">
-          <div style="font-weight: bold; color: ${isExceeded ? '#ef4444' : 'var(--primary)'};">
-            ${totalTokensStr} <span style="font-weight: normal; color: #94a3b8; font-size: 0.85rem;">/ ${maxTokensDisplay}</span>
+        <td>${requests.toLocaleString()} 次</td>
+        <td>
+          <div style="font-weight: 600; color: ${isExceeded ? 'var(--destructive)' : 'var(--foreground)'};">
+            ${totalTokensStr} <span style="font-weight: normal; color: var(--muted-foreground); font-size: 0.785rem;">/ ${maxTokensDisplay}</span>
           </div>
           ${k.maxTokens ? `
-            <div style="background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 4px; width: 120px;">
+            <div style="background: #e4e4e7; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 4px; width: 100px;">
               <div style="width: ${quotaPercent}%; background: ${isExceeded ? '#ef4444' : '#10b981'}; height: 100%;"></div>
             </div>
           ` : ''}
         </td>
-        <td style="padding: 10px; font-size: 0.82rem; color: #64748b; white-space: nowrap;">
+        <td style="font-size: 0.785rem; color: var(--muted-foreground);">
           <div>创建: ${createdDate}</div>
           <div>使用: ${lastUsedDate}</div>
         </td>
-        <td style="padding: 10px; text-align: right; white-space: nowrap;">
-          <button class="btn btn-xs btn-primary" onclick="showEditApiKeyModal('${k.id}')" style="margin-right: 4px;">✏️ 编辑</button>
-          <button class="btn btn-xs btn-danger" onclick="deleteApiKey('${k.id}', '${escapeHtml(k.name)}')">🗑️ 删除</button>
+        <td style="text-align: right;">
+          <button class="btn btn-secondary btn-xs" onclick="showEditApiKeyModal('${k.id}')" style="margin-right: 4px;">✏️ 编辑</button>
+          <button class="btn btn-destructive btn-xs" onclick="deleteApiKey('${k.id}', '${escapeHtml(k.name)}')">🗑️ 删除</button>
         </td>
       </tr>
     `;
@@ -625,25 +675,29 @@ async function toggleApiKeyEnabled(id, enabled) {
 function openAddKeyModal() {
   const defaultKey = 'sk-' + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'ui-dialog-backdrop';
   modal.innerHTML = `
-    <div class="modal-content">
-      <div class="modal-title">➕ 新建 API 密钥</div>
-      <div class="form-group">
-        <label>密钥名称 / 备注</label>
-        <input type="text" id="newApiKeyName" placeholder="例如: 生产应用 / 客户A" value="API Key">
+    <div class="ui-dialog">
+      <div class="ui-dialog-header">
+        <div class="ui-dialog-title">新建 API 密钥</div>
       </div>
-      <div class="form-group">
-        <label>自定义密钥字符串 (留空自动生成)</label>
-        <input type="text" id="newApiKeyString" placeholder="${defaultKey}">
+      <div class="ui-dialog-body">
+        <div class="form-group">
+          <label class="form-label">密钥名称 / 备注</label>
+          <input type="text" id="newApiKeyName" class="form-input" placeholder="例如: 生产应用 / 客户A" value="API Key">
+        </div>
+        <div class="form-group">
+          <label class="form-label">自定义密钥字符串 (留空自动生成)</label>
+          <input type="text" id="newApiKeyString" class="form-input" placeholder="${defaultKey}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Token 累计消耗上限阈值 (0 或留空代表不限制)</label>
+          <input type="number" id="newApiKeyMaxTokens" class="form-input" placeholder="例如: 100000000 即 1 亿 Token">
+        </div>
       </div>
-      <div class="form-group">
-        <label>Token 累计消耗上限阈值 (设为 0 或留空代表无限制，例如: 100000000 即 1 亿 Token)</label>
-        <input type="number" id="newApiKeyMaxTokens" placeholder="例如: 100000000">
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
-        <button class="btn btn-success" id="confirmCreateApiKeyBtn">确认创建</button>
+      <div class="ui-dialog-footer">
+        <button class="btn btn-outline" onclick="this.closest('.ui-dialog-backdrop').remove()">取消</button>
+        <button class="btn btn-primary" id="confirmCreateApiKeyBtn">确认创建</button>
       </div>
     </div>
   `;
@@ -681,24 +735,28 @@ function showEditApiKeyModal(id) {
   if (!targetKey) return;
 
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'ui-dialog-backdrop';
   modal.innerHTML = `
-    <div class="modal-content">
-      <div class="modal-title">✏️ 编辑 API 密钥【${escapeHtml(targetKey.name)}】</div>
-      <div class="form-group">
-        <label>密钥名称</label>
-        <input type="text" id="editApiKeyName" value="${escapeHtml(targetKey.name)}">
+    <div class="ui-dialog">
+      <div class="ui-dialog-header">
+        <div class="ui-dialog-title">编辑 API 密钥【${escapeHtml(targetKey.name)}】</div>
       </div>
-      <div class="form-group">
-        <label>密钥字符串</label>
-        <input type="text" id="editApiKeyString" value="${escapeHtml(targetKey.key)}">
+      <div class="ui-dialog-body">
+        <div class="form-group">
+          <label class="form-label">密钥名称</label>
+          <input type="text" id="editApiKeyName" class="form-input" value="${escapeHtml(targetKey.name)}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">密钥字符串</label>
+          <input type="text" id="editApiKeyString" class="form-input" value="${escapeHtml(targetKey.key)}">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Token 累计消耗上限阈值 (0 或留空为不限制)</label>
+          <input type="number" id="editApiKeyMaxTokens" class="form-input" value="${targetKey.maxTokens || ''}" placeholder="不限制">
+        </div>
       </div>
-      <div class="form-group">
-        <label>Token 累计消耗上限阈值 (0 或留空为不限制，例如: 100000000 代表 1 亿 Token)</label>
-        <input type="number" id="editApiKeyMaxTokens" value="${targetKey.maxTokens || ''}" placeholder="不限制">
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
+      <div class="ui-dialog-footer">
+        <button class="btn btn-outline" onclick="this.closest('.ui-dialog-backdrop').remove()">取消</button>
         <button class="btn btn-primary" id="confirmEditApiKeyBtn">保存修改</button>
       </div>
     </div>
@@ -791,7 +849,7 @@ function renderStatsDashboard() {
   const overallTotalTokens = globalApiKeysData.stats?.totalTokens || totalAll || 1;
 
   if (filteredKeys.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">暂无使用统计数据</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--muted-foreground);">暂无使用统计数据</td></tr>`;
     return;
   }
 
@@ -800,27 +858,24 @@ function renderStatsDashboard() {
     const percent = overallTotalTokens > 0 ? ((u.totalTokens / overallTotalTokens) * 100).toFixed(1) : '0.0';
 
     return `
-      <tr style="border-bottom: 1px solid var(--border-color);">
-        <td style="padding: 10px; font-weight: bold;">${escapeHtml(k.name)}</td>
-        <td style="padding: 10px;">${(u.requests || 0).toLocaleString()} 次</td>
-        <td style="padding: 10px; color: #10b981; font-weight: 500;">${(u.inputTokens || 0).toLocaleString()}</td>
-        <td style="padding: 10px; color: #f59e0b; font-weight: 500;">${(u.outputTokens || 0).toLocaleString()}</td>
-        <td style="padding: 10px; color: #3b82f6; font-weight: bold;">${(u.totalTokens || 0).toLocaleString()}</td>
-        <td style="padding: 10px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="flex: 1; background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden; min-width: 80px;">
-              <div style="width: ${percent}%; background: var(--primary); height: 100%;"></div>
+      <tr>
+        <td style="font-weight: 600;">${escapeHtml(k.name)}</td>
+        <td>${(u.requests || 0).toLocaleString()} 次</td>
+        <td style="color: #059669; font-weight: 500;">${(u.inputTokens || 0).toLocaleString()}</td>
+        <td style="color: #d97706; font-weight: 500;">${(u.outputTokens || 0).toLocaleString()}</td>
+        <td style="color: #2563eb; font-weight: 600;">${(u.totalTokens || 0).toLocaleString()}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="flex: 1; background: #e4e4e7; height: 6px; border-radius: 3px; overflow: hidden; min-width: 60px;">
+              <div style="width: ${percent}%; background: var(--foreground); height: 100%;"></div>
             </div>
-            <span style="font-size: 0.85rem; color: #64748b; min-width: 45px;">${percent}%</span>
+            <span style="font-size: 0.785rem; color: var(--muted-foreground); min-width: 40px;">${percent}%</span>
           </div>
         </td>
       </tr>
     `;
   }).join('');
 }
-
-// 兼容别名
-const loadKeys = loadApiKeys;
 
 // ==================== 系统与 SSL 配置 ====================
 
@@ -915,14 +970,14 @@ async function loadBlockedIps() {
     if (data.success) {
       const list = data.data || [];
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #94a3b8;">暂无被封禁的 IP</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: var(--muted-foreground);">暂无被封禁的 IP</td></tr>`;
         return;
       }
 
       tbody.innerHTML = list.map(item => {
         const typeBadge = item.permanent 
-          ? `<span style="background:#ef4444; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.75rem; font-weight:bold;">永久黑名单</span>`
-          : `<span style="background:#f59e0b; color:#fff; padding:2px 6px; border-radius:4px; font-size:0.75rem;">临时封禁</span>`;
+          ? `<span class="badge badge-danger">永久黑名单</span>`
+          : `<span class="badge badge-warning">临时封禁</span>`;
 
         let statusText = '永久拦截';
         if (!item.permanent && item.expiresAt) {
@@ -931,13 +986,13 @@ async function loadBlockedIps() {
         }
 
         return `
-          <tr style="border-bottom: 1px solid var(--border-color);">
-            <td style="padding: 8px; font-family: monospace; font-weight: bold; color: #ef4444;">${escapeHtml(item.ip)}</td>
-            <td style="padding: 8px;">${typeBadge}</td>
-            <td style="padding: 8px; font-size: 0.85rem; color: #64748b;">${statusText}</td>
-            <td style="padding: 8px;">${item.tempBlockCount || 0} 次</td>
-            <td style="padding: 8px; text-align: right;">
-              <button class="btn btn-xs btn-success" onclick="unblockIp('${escapeHtml(item.ip)}')">🔓 解除封禁</button>
+          <tr>
+            <td style="font-family: var(--font-mono); font-weight: 600; color: var(--destructive);">${escapeHtml(item.ip)}</td>
+            <td>${typeBadge}</td>
+            <td style="font-size: 0.825rem; color: var(--muted-foreground);">${statusText}</td>
+            <td>${item.tempBlockCount || 0} 次</td>
+            <td style="text-align: right;">
+              <button class="btn btn-outline btn-xs" onclick="unblockIp('${escapeHtml(item.ip)}')">🔓 解除封禁</button>
             </td>
           </tr>
         `;
@@ -953,24 +1008,28 @@ function promptBlockIp(ip) {
   }
 
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'ui-dialog-backdrop';
   modal.innerHTML = `
-    <div class="modal-content" style="max-width: 440px;">
-      <div class="modal-title">🛡️ 快捷封禁 / 加入黑名单</div>
-      <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:12px; margin-bottom:14px; font-size:0.88rem; color:#991b1b;">
-        是否将目标 IP <code>${escapeHtml(ip)}</code> 拦截封禁？
+    <div class="ui-dialog" style="max-width: 420px;">
+      <div class="ui-dialog-header">
+        <div class="ui-dialog-title">快捷封禁 / 加入黑名单</div>
       </div>
-      <div class="form-group">
-        <label>封禁类型</label>
-        <select id="quickBlockType">
-          <option value="temp_60">临时封禁 60 分钟</option>
-          <option value="temp_1440">临时封禁 24 小时</option>
-          <option value="perm">永久加入黑名单 (禁止所有访问)</option>
-        </select>
+      <div class="ui-dialog-body">
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius); padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: #991b1b;">
+          是否拦截目标 IP <code style="font-weight: 600;">${escapeHtml(ip)}</code>？
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">封禁类型</label>
+          <select id="quickBlockType" class="form-select">
+            <option value="temp_60">临时封禁 60 分钟</option>
+            <option value="temp_1440">临时封禁 24 小时</option>
+            <option value="perm">永久加入黑名单 (禁止所有访问)</option>
+          </select>
+        </div>
       </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
-        <button class="btn btn-danger" id="confirmQuickBlockBtn">🚫 确认拦截</button>
+      <div class="ui-dialog-footer">
+        <button class="btn btn-outline" onclick="this.closest('.ui-dialog-backdrop').remove()">取消</button>
+        <button class="btn btn-destructive" id="confirmQuickBlockBtn">🚫 确认拦截</button>
       </div>
     </div>
   `;
@@ -1004,25 +1063,29 @@ function promptBlockIp(ip) {
 
 function openManualBlockModal() {
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'ui-dialog-backdrop';
   modal.innerHTML = `
-    <div class="modal-content" style="max-width: 440px;">
-      <div class="modal-title">➕ 手动添加封禁 IP</div>
-      <div class="form-group">
-        <label>IP 地址</label>
-        <input type="text" id="manualBlockIp" placeholder="例如: 123.45.67.89">
+    <div class="ui-dialog" style="max-width: 420px;">
+      <div class="ui-dialog-header">
+        <div class="ui-dialog-title">手动添加封禁 IP</div>
       </div>
-      <div class="form-group">
-        <label>封禁类型</label>
-        <select id="manualBlockType">
-          <option value="perm">永久加入黑名单</option>
-          <option value="temp_60">临时封禁 60 分钟</option>
-          <option value="temp_1440">临时封禁 24 小时</option>
-        </select>
+      <div class="ui-dialog-body">
+        <div class="form-group">
+          <label class="form-label">IP 地址</label>
+          <input type="text" id="manualBlockIp" class="form-input" placeholder="例如: 123.45.67.89">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">封禁类型</label>
+          <select id="manualBlockType" class="form-select">
+            <option value="perm">永久加入黑名单</option>
+            <option value="temp_60">临时封禁 60 分钟</option>
+            <option value="temp_1440">临时封禁 24 小时</option>
+          </select>
+        </div>
       </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">取消</button>
-        <button class="btn btn-danger" id="confirmManualBlockBtn">🚫 添加封禁</button>
+      <div class="ui-dialog-footer">
+        <button class="btn btn-outline" onclick="this.closest('.ui-dialog-backdrop').remove()">取消</button>
+        <button class="btn btn-destructive" id="confirmManualBlockBtn">🚫 添加封禁</button>
       </div>
     </div>
   `;
