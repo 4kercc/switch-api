@@ -48,6 +48,9 @@
         <div class="nav-item" data-tab="tab-keys" onclick="switchTab('tab-keys')">
           <span>🔑</span> API 密钥管理
         </div>
+        <div class="nav-item" data-tab="tab-stats" onclick="switchTab('tab-stats')">
+          <span>📈</span> 使用记录 (统计看板)
+        </div>
         <div class="nav-item" data-tab="tab-settings" onclick="switchTab('tab-settings')">
           <span>⚙️</span> 系统与 SSL 设置
         </div>
@@ -122,24 +125,122 @@
         </div>
       </section>
 
-      <!-- Tab 3: API Key 管理 -->
+      <!-- Tab 3: API Key 管理 (表格化管理、Token上限熔断阈值、复制/编辑/删除) -->
       <section id="tab-keys" class="tab-pane">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <div>
             <h2 style="font-size: 1.3rem;">🔑 API 访问密钥管理</h2>
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
-              客户端在调用 <code>/v1/chat/completions</code>、<code>/v2/...</code> 或自定义分流接口时，需携带以下有效密钥进行鉴权。
+              客户端在调用 <code>/v1/chat/completions</code>、<code>/v2/...</code> 或自定义分流接口时，需携带有效密钥进行鉴权。支持单独设置 Token 消耗上限阈值。
             </p>
           </div>
-          <button class="btn btn-primary" onclick="openAddKeyModal()">➕ 创建新密钥</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-success" onclick="openAddKeyModal()">➕ 新建 API 密钥</button>
+            <button class="btn btn-secondary" onclick="loadApiKeys()">🔄 刷新</button>
+          </div>
         </div>
 
-        <div id="keysContainer" style="display: flex; flex-direction: column; gap: 10px;">
-          <div style="text-align: center; color: #94a3b8; padding: 40px;">正在加载密钥列表...</div>
+        <!-- 概览徽章 -->
+        <div style="display: flex; gap: 12px; margin-bottom: 14px;">
+          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 16px; font-size: 0.88rem;">
+            密钥总数: <b id="keyStatTotal" style="color: var(--primary);">0</b>
+          </div>
+          <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 16px; font-size: 0.88rem;">
+            已启用: <b id="keyStatEnabled" style="color: #10b981;">0</b>
+          </div>
+        </div>
+
+        <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; overflow-x: auto;">
+          <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border-color); text-align: left; color: #64748b;">
+                <th style="padding: 10px;">名称</th>
+                <th style="padding: 10px;">API 密钥 (Key)</th>
+                <th style="padding: 10px;">状态</th>
+                <th style="padding: 10px;">已用请求数</th>
+                <th style="padding: 10px;">累计 Token 消耗 / 上限阈值</th>
+                <th style="padding: 10px;">创建 / 最后使用</th>
+                <th style="padding: 10px; text-align: right;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="apiKeysTableBody">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 30px; color: #94a3b8;">正在加载密钥列表...</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <!-- Tab 4: 系统与 SSL 设置 -->
+      <!-- Tab 4: 使用记录 (统计看板与模型维度分析) -->
+      <section id="tab-stats" class="tab-pane">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h2 style="font-size: 1.3rem;">📈 API 密钥使用记录与统计看板</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
+              按 API Key 筛选查看请求频次、输入/输出 Token 构成、占比分析与各模型调用分布。
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="statsApiKeySelect" onchange="renderStatsDashboard()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <option value="all">全部 API 密钥</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="loadApiKeys()">🔄 刷新统计</button>
+          </div>
+        </div>
+
+        <!-- 四大核心指标概览 -->
+        <div class="stats-grid" style="margin-bottom: 20px;">
+          <div class="stat-card">
+            <span class="stat-label">总请求次数</span>
+            <span class="stat-val" id="dashTotalRequests" style="color: var(--primary);">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Input Tokens (输入)</span>
+            <span class="stat-val" id="dashInputTokens" style="color: #10b981;">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Output Tokens (输出)</span>
+            <span class="stat-val" id="dashOutputTokens" style="color: #f59e0b;">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Total Tokens (总量)</span>
+            <span class="stat-val" id="dashTotalTokens" style="color: #3b82f6;">0</span>
+          </div>
+        </div>
+
+        <!-- 各 Key 消费明细及进度条占比列表 -->
+        <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 18px; margin-bottom: 24px; overflow-x: auto;">
+          <h4 style="margin-bottom: 12px; font-size: 1rem; color: #1e293b;">📊 API 密钥消耗明细与占比</h4>
+          <table style="width: 100%; min-width: 700px; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border-color); text-align: left; color: #64748b;">
+                <th style="padding: 10px;">API 密钥</th>
+                <th style="padding: 10px;">请求数</th>
+                <th style="padding: 10px;">输入 Tokens</th>
+                <th style="padding: 10px;">输出 Tokens</th>
+                <th style="padding: 10px;">总 Tokens</th>
+                <th style="padding: 10px;">占比 (Total Tokens)</th>
+              </tr>
+            </thead>
+            <tbody id="statsTableBody">
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 24px; color: #94a3b8;">暂无数据</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 公开使用量自查说明 -->
+        <div style="background: rgba(79, 70, 229, 0.05); border: 1px dashed rgba(79, 70, 229, 0.3); border-radius: 8px; padding: 14px 18px;">
+          <h4 style="font-size: 0.92rem; color: var(--primary); margin-bottom: 4px;">💡 公开使用量查询端点 (Client Self-Check API)</h4>
+          <p style="font-size: 0.85rem; color: #475569;">
+            客户端或第三方系统可向 <code>POST /api/check-usage</code> 发送 <code>{"key": "sk-..."}</code> 查询当前 Key 的剩余额度、消耗进度与模型分布。
+          </p>
+        </div>
+      </section>
+
+      <!-- Tab 5: 系统与 SSL 设置 -->
       <section id="tab-settings" class="tab-pane">
         <div style="max-width: 720px;">
           <h2 style="font-size: 1.3rem; margin-bottom: 16px;">⚙️ 系统与 SSL 域名配置</h2>
@@ -150,7 +251,7 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
               <div class="form-group">
                 <label>监听端口 (PORT)</label>
-                <input type="number" id="cfgPort" placeholder="8045">
+                <input type="number" id="cfgPort" placeholder="8046">
               </div>
               <div class="form-group">
                 <label>监听地址 (HOST)</label>

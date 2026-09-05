@@ -172,6 +172,24 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), service: 'api-gateway-allin' });
 });
 
+// 公开 API Key 使用量查询端点
+app.post('/api/check-usage', (req, res) => {
+  const { key } = req.body || {};
+  if (!key || typeof key !== 'string' || !key.trim()) {
+    return res.status(400).json({ success: false, message: '请输入要查询的 API 密钥 (Key)' });
+  }
+
+  const report = apiKeyManager.queryUsageReport(key.trim());
+  if (!report) {
+    return res.status(404).json({ success: false, message: '未找到该 API 密钥，请检查输入是否正确' });
+  }
+
+  res.json({
+    success: true,
+    data: report
+  });
+});
+
 // 404
 app.use((req, res) => {
   res.status(404).json({ error: 'Not Found', path: req.path });

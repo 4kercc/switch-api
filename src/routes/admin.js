@@ -161,24 +161,69 @@ router.post('/channels/:id/test', cookieAuthMiddleware, async (req, res) => {
   }
 });
 
-// ==================== API Key 管理 ====================
+// ==================== API Key 管理 (完整移植) ====================
 
-router.get('/keys', cookieAuthMiddleware, async (req, res) => {
-  const keys = await apiKeyManager.getAllKeys();
-  res.json({ success: true, data: keys });
+// 获取所有 API Key 及其统计概览
+router.get('/api-keys', cookieAuthMiddleware, async (req, res) => {
+  try {
+    const keys = apiKeyManager.getAllKeys();
+    const stats = apiKeyManager.getOverallStats();
+    res.json({ success: true, data: { keys, stats } });
+  } catch (error) {
+    logger.error('获取 API 密钥列表失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-router.post('/keys', cookieAuthMiddleware, async (req, res) => {
-  const { name, key, role } = req.body || {};
-  const newKey = await apiKeyManager.addKey({ name, key, role });
-  res.json({ success: true, message: 'API 密钥创建成功', data: newKey });
+// 新建 API Key (支持自定义 Key 与 maxTokens 阈值)
+router.post('/api-keys', cookieAuthMiddleware, async (req, res) => {
+  try {
+    const { name, key, maxTokens } = req.body || {};
+    const newKey = apiKeyManager.createKey({ name, key, maxTokens });
+    logger.info(`✓ 创建新 API 密钥: ${newKey.name} (${newKey.id}), maxTokens=${newKey.maxTokens || '无限制'}`);
+    res.json({ success: true, data: newKey, message: '创建 API 密钥成功' });
+  } catch (error) {
+    logger.error('创建 API 密钥失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
-router.delete('/keys/:id', cookieAuthMiddleware, async (req, res) => {
-  const { id } = req.params;
-  const ok = await apiKeyManager.deleteKey(id);
-  if (!ok) return res.status(404).json({ success: false, message: '密钥不存在' });
-  res.json({ success: true, message: 'API 密钥已删除' });
+// 更新 API Key (修改名称 / 启用开关 / Key 字符串 / maxTokens 阈值)
+router.put('/api-keys/:id', cookieAuthMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, enabled, key, maxTokens } = req.body || {};
+    const updated = apiKeyManager.updateKey(id, { name, enabled, key, maxTokens });
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'API 密钥不存在' });
+    }
+    logger.info(`✓ 更新 API 密钥 (${id}): ${updated.name}, enabled=${updated.enabled}, maxTokens=${updated.maxTokens || '无限制'}`);
+    res.json({ success: true, data: updated, message: '更新成功' });
+  } catch (error) {
+    logger.error('更新 API 密钥失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 删除 API Key
+router.delete('/api-keys/:id', cookieAuthMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ok = apiKeyManager.deleteKey(id);
+    if (!ok) {
+      return res.status(404).json({ success: false, message: 'API 密钥不存在' });
+    }
+    logger.info(`✓ 删除 API 密钥 (${id})`);
+    res.json({ success: true, message: '删除成功' });
+  } catch (error) {
+    logger.error('删除 API 密钥失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 兼容旧接口
+router.get('/keys', cookieAuthMiddleware, (req, res) => {
+  res.json({ success: true, data: apiKeyManager.getAllKeys() });
 });
 
 // ==================== 系统设置 ====================
