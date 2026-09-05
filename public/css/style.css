@@ -776,6 +776,15 @@ input:checked + .ui-switch-slider:before {
   border-top: 1px solid #f4f4f5;
 }
 
+/* 标签页内容切换 */
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
 .hidden { display: none !important; }
 
 /* 响应式适配 (Mobile Responsive Breakpoints) */
